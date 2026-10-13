@@ -10,6 +10,10 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: account
+    description: Authenticated account data
+  - name: assistant
+    description: Gemini-powered kitchen assistant
 paths:
   /healthz:
     get:
@@ -24,7 +28,194 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /me/data:
+    get:
+      operationId: getMyData
+      tags: [account]
+      security:
+        - clerkSession: []
+      summary: Get the current user's kitchen data
+      responses:
+        "200":
+          description: The signed-in user's data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountData"
+        "401":
+          description: Authentication required
+    put:
+      operationId: saveMyData
+      tags: [account]
+      security:
+        - clerkSession: []
+      summary: Save the current user's kitchen data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountDataInput"
+      responses:
+        "200":
+          description: Saved account data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountData"
+        "400":
+          description: Invalid data
+        "401":
+          description: Authentication required
+  /me/import:
+    post:
+      operationId: importMyData
+      tags: [account]
+      security:
+        - clerkSession: []
+      summary: Import browser data once per import request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountImportInput"
+      responses:
+        "200":
+          description: Imported or previously imported data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountData"
+        "401":
+          description: Authentication required
+  /me/account:
+    delete:
+      operationId: deleteMyAccountData
+      tags: [account]
+      security:
+        - clerkSession: []
+      summary: Delete the signed-in user's Pantri data
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Authentication required
+  /assistant/history:
+    get:
+      operationId: getAssistantHistory
+      tags: [assistant]
+      security:
+        - clerkSession: []
+      summary: Get the signed-in user's assistant history
+      responses:
+        "200":
+          description: Assistant messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssistantHistory"
+        "401":
+          description: Authentication required
+    delete:
+      operationId: clearAssistantHistory
+      tags: [assistant]
+      security:
+        - clerkSession: []
+      summary: Clear the signed-in user's assistant history
+      responses:
+        "204":
+          description: Cleared
+        "401":
+          description: Authentication required
+  /assistant/chat:
+    post:
+      operationId: sendAssistantMessage
+      tags: [assistant]
+      security:
+        - clerkSession: []
+      summary: Ask the kitchen assistant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssistantMessageInput"
+      responses:
+        "200":
+          description: Assistant reply with validated, unexecuted action suggestions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssistantReply"
+        "401":
+          description: Authentication required
+        "429":
+          description: Application or Gemini free-tier quota reached
+        "503":
+          description: Gemini API key is not configured
+  /assistant/recipes:
+    post:
+      operationId: generateAssistantRecipe
+      tags: [assistant]
+      security:
+        - clerkSession: []
+      summary: Generate a structured recipe using the signed-in user's kitchen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecipePromptInput"
+      responses:
+        "200":
+          description: Generated recipe with explicit ingredient quantities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratedRecipe"
+        "401":
+          description: Authentication required
+        "429":
+          description: Application or Gemini free-tier quota reached
+        "503":
+          description: Gemini API key is not configured
+  /assistant/scan:
+    post:
+      operationId: analyzeKitchenImage
+      tags: [assistant]
+      security:
+        - clerkSession: []
+      summary: Analyze a receipt or food photo; does not change inventory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KitchenImageInput"
+      responses:
+        "200":
+          description: Editable scan candidates for user review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KitchenImageAnalysis"
+        "400":
+          description: Unsupported image or invalid input
+        "401":
+          description: Authentication required
+        "413":
+          description: Image exceeds the upload limit
+        "429":
+          description: Application or Gemini free-tier quota reached
+        "503":
+          description: Gemini API key is not configured
 components:
+  securitySchemes:
+    clerkSession:
+      type: apiKey
+      in: cookie
+      name: __session
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +224,182 @@ components:
           type: string
       required:
         - status
+    FoodItem:
+      type: object
+      required: [id, name, quantity, unit, location, expirationDate]
+      properties:
+        id: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        quantity: { type: number, minimum: 0 }
+        unit: { type: string, maxLength: 40 }
+        location: { type: string, enum: [Pantry, Fridge, Freezer] }
+        expirationDate: { type: ["string", "null"], format: date }
+    ShoppingItem:
+      type: object
+      required: [id, name, checked]
+      properties:
+        id: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        quantity: { type: ["number", "null"], minimum: 0 }
+        unit: { type: ["string", "null"], maxLength: 40 }
+        checked: { type: boolean }
+        sourceRecipe: { type: ["string", "null"], maxLength: 120 }
+    Preferences:
+      type: object
+      required: [dietaryFilters, householdSize, units, expirationReminders]
+      properties:
+        dietaryFilters:
+          type: array
+          items: { type: string, maxLength: 40 }
+        householdSize: { type: integer, minimum: 1, maximum: 20 }
+        units: { type: string, enum: [Metric, Imperial] }
+        expirationReminders: { type: boolean }
+    RecipeIngredient:
+      type: object
+      required: [name, quantity, unit]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        quantity: { type: number, minimum: 0 }
+        unit: { type: string, minLength: 1, maxLength: 40 }
+    SavedRecipe:
+      type: object
+      required: [id, title, servings, ingredients, instructions, minutes, dietaryTags]
+      properties:
+        id: { type: string, minLength: 1 }
+        title: { type: string, minLength: 1, maxLength: 160 }
+        servings: { type: integer, minimum: 1, maximum: 30 }
+        ingredients:
+          type: array
+          items: { $ref: "#/components/schemas/RecipeIngredient" }
+        instructions:
+          type: array
+          items: { type: string, minLength: 1, maxLength: 500 }
+        minutes: { type: integer, minimum: 1, maximum: 1440 }
+        dietaryTags:
+          type: array
+          items: { type: string, maxLength: 40 }
+        caloriesPerServing: { type: ["number", "null"], minimum: 0 }
+        proteinGramsPerServing: { type: ["number", "null"], minimum: 0 }
+        fiberGramsPerServing: { type: ["number", "null"], minimum: 0 }
+    MealPlanItem:
+      type: object
+      required: [id, date, meal, title]
+      properties:
+        id: { type: string, minLength: 1 }
+        date: { type: string, format: date }
+        meal: { type: string, enum: [Breakfast, Lunch, Dinner, Snack] }
+        title: { type: string, minLength: 1, maxLength: 160 }
+        recipeId: { type: ["string", "null"] }
+    AccountData:
+      type: object
+      required: [inventory, shopping, preferences, savedRecipes, mealPlan]
+      properties:
+        inventory:
+          type: array
+          items: { $ref: "#/components/schemas/FoodItem" }
+        shopping:
+          type: array
+          items: { $ref: "#/components/schemas/ShoppingItem" }
+        preferences: { $ref: "#/components/schemas/Preferences" }
+        savedRecipes:
+          type: array
+          items: { $ref: "#/components/schemas/SavedRecipe" }
+        mealPlan:
+          type: array
+          items: { $ref: "#/components/schemas/MealPlanItem" }
+    AccountDataInput:
+      type: object
+      required: [inventory, shopping, preferences, savedRecipes, mealPlan]
+      properties:
+        inventory:
+          type: array
+          items: { $ref: "#/components/schemas/FoodItem" }
+        shopping:
+          type: array
+          items: { $ref: "#/components/schemas/ShoppingItem" }
+        preferences: { $ref: "#/components/schemas/Preferences" }
+        savedRecipes:
+          type: array
+          items: { $ref: "#/components/schemas/SavedRecipe" }
+        mealPlan:
+          type: array
+          items: { $ref: "#/components/schemas/MealPlanItem" }
+    AccountImportInput:
+      type: object
+      required: [requestId, data]
+      properties:
+        requestId: { type: string, minLength: 8, maxLength: 100 }
+        data: { $ref: "#/components/schemas/AccountDataInput" }
+    AssistantMessageInput:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string, minLength: 1, maxLength: 4000 }
+    AssistantMessage:
+      type: object
+      required: [id, role, content, createdAt]
+      properties:
+        id: { type: string }
+        role: { type: string, enum: [user, assistant] }
+        content: { type: string, maxLength: 8000 }
+        createdAt: { type: string, format: date-time }
+    AssistantHistory:
+      type: object
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          items: { $ref: "#/components/schemas/AssistantMessage" }
+    AssistantAction:
+      type: object
+      required: [type, name, quantity, unit, location]
+      properties:
+        type: { type: string, enum: [add_inventory, add_shopping] }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        quantity: { type: number, minimum: 0 }
+        unit: { type: string, maxLength: 40 }
+        location: { type: string, enum: [Pantry, Fridge, Freezer] }
+    AssistantReply:
+      type: object
+      required: [answer, actions]
+      properties:
+        answer: { type: string, maxLength: 8000 }
+        actions:
+          type: array
+          maxItems: 5
+          items: { $ref: "#/components/schemas/AssistantAction" }
+    RecipePromptInput:
+      type: object
+      required: [prompt]
+      properties:
+        prompt: { type: string, minLength: 1, maxLength: 1000 }
+    GeneratedRecipe:
+      allOf:
+        - $ref: "#/components/schemas/SavedRecipe"
+    KitchenImageInput:
+      type: object
+      required: [imageBase64, mimeType, mode]
+      properties:
+        imageBase64: { type: string, minLength: 100, maxLength: 7000000 }
+        mimeType: { type: string, enum: [image/jpeg, image/png, image/webp] }
+        mode: { type: string, enum: [receipt, food_photo] }
+    ScanCandidate:
+      type: object
+      required: [name, quantity, unit, location, confidence, notes]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        quantity: { type: number, minimum: 0 }
+        unit: { type: string, maxLength: 40 }
+        location: { type: string, enum: [Pantry, Fridge, Freezer] }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        notes: { type: string, maxLength: 300 }
+    KitchenImageAnalysis:
+      type: object
+      required: [items, notes]
+      properties:
+        items:
+          type: array
+          maxItems: 60
+          items: { $ref: "#/components/schemas/ScanCandidate" }
+        notes: { type: string, maxLength: 1000 }
 

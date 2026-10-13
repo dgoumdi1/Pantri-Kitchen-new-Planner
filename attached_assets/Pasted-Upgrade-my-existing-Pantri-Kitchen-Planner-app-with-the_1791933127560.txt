@@ -1,0 +1,196 @@
+Upgrade my existing Pantri Kitchen Planner app with the features below. Work within the existing project, keep its current visual design and mobile-friendly layout, and preserve working inventory, recipe, shopping-list, and settings features.
+
+IMPORTANT:
+Implement working frontend and backend functionality, not just UI mockups or placeholder buttons. Inspect the project first, identify the existing stack, and choose compatible services. Explain any required external credentials, costs, or setup before implementing those integrations. Never claim an integration works if it is only simulated.
+
+1. USER ACCOUNTS AND AUTHENTICATION
+
+Add account creation and login using:
+- Continue with Google
+- Continue with Apple
+- Email and password
+
+Use a reputable managed authentication service that supports all three methods and works with this app’s stack. Do not build custom password storage.
+
+Include:
+- Sign-up and login pages matching the Pantri design.
+- Email verification, password reset, and clear error messages.
+- A display name field during email signup.
+- For social login, use the provider’s name when available; ask the user for a display name when it is missing.
+- A profile/settings section where users can edit their display name and log out.
+- Secure persistent sessions so users remain signed in across refreshes and can return later, unless they log out or their session expires.
+- Account deletion with explicit confirmation.
+
+Keep API keys and credentials on the server or in Replit Secrets, never in frontend code.
+
+If Google or Apple requires provider-console setup, redirect URLs, or credentials, tell me exactly what I must configure. Do not show a successful login for an unconfigured provider.
+
+2. SAVE DATA TO EACH USER’S ACCOUNT
+
+Move account data from browser-only storage to a persistent database.
+
+Each user should have their own:
+- Pantry, fridge, and freezer inventory.
+- Shopping list.
+- Dietary preferences and nutrition goals.
+- Saved recipes.
+- AI chat history.
+
+Enforce ownership on the server for every read and write. Never trust a user ID supplied by the browser without checking the authenticated session.
+
+Make data available when the same user logs in on another device.
+
+If existing local inventory is present, offer to import it into the signed-in account. Require confirmation, avoid duplicate imports, and do not silently assign demo data to new accounts.
+
+3. PERSONALIZED, TIME-BASED GREETING
+
+Replace “Good morning, cook.” with the signed-in user’s display name.
+
+Examples:
+- Good morning, Douaa.
+- Good afternoon, Douaa.
+- Good evening, Douaa.
+
+Use the user’s local time:
+- Morning: 5:00 AM–11:59 AM
+- Afternoon: 12:00 PM–4:59 PM
+- Evening: 5:00 PM–4:59 AM
+
+Update the greeting when the app opens, when the browser tab becomes active, and when the time crosses a greeting boundary. Do not use server time as the user’s local time.
+
+Use “Welcome to Pantri” when a name is unavailable, rather than calling the user “cook.”
+
+4. IN-APP AI KITCHEN ASSISTANT
+
+Add a floating chat button that opens a mobile-friendly assistant panel.
+
+The assistant should help users:
+- Find recipes using their actual inventory.
+- Prioritize ingredients expiring soon.
+- Suggest high-protein or high-fiber meals.
+- Respect saved dietary preferences and allergies.
+- Plan meals.
+- Explain recipe steps and suggest substitutions.
+- Prepare additions to inventory or shopping lists.
+
+Connect it to a real AI service through the backend. Never expose the AI API key.
+
+Give the assistant access only to the current user’s authorized data. Treat uploaded images, receipt text, and user messages as untrusted input, not instructions that can override app rules.
+
+Use validated backend tools for actions. The assistant must show a preview and ask for confirmation before adding, changing, or deleting inventory, shopping-list items, or meal plans. Reading inventory and suggesting recipes should not require confirmation.
+
+Provide loading states, retry options, useful error messages, and reasonable usage limits. Store chat history per user and allow users to clear it.
+
+Do not claim that an action succeeded unless the backend confirms it.
+
+5. RECEIPT AND FOOD PHOTO SCANNING
+
+Add a “Scan / Add from photo” feature accessible from the dashboard and inventory screens.
+
+Support:
+- Taking a picture using the phone camera.
+- Uploading an existing image.
+- Scanning a grocery receipt.
+- Photographing a fridge, pantry, or individual food items.
+
+Use real OCR and/or a vision-capable AI service.
+
+For receipts:
+- Extract food products and quantities when visible.
+- Ignore totals, payment information, taxes, discounts, and non-food purchases.
+- Turn abbreviated product names into readable names.
+- Preserve the original detected text for review.
+
+For fridge, pantry, and item photos:
+- Identify visible food items.
+- Suggest pantry, fridge, or freezer storage.
+- Estimate counts only when reasonably supported by the image.
+- Do not invent hidden items, exact weights, expiration dates, or nutrition values.
+- Mark uncertain results as “Needs review.”
+
+Automatically create a proposed inventory list, then show an editable review screen before saving.
+
+The review screen must allow users to:
+- Rename items.
+- Change quantity and unit.
+- Choose storage location.
+- Enter an expiration date or leave it unknown.
+- Remove incorrect detections.
+- Select which items to import.
+- Confirm “Add selected items.”
+
+Detect potential duplicates and let users choose whether to merge quantities or create a separate item. Do not merge incompatible units automatically. Prevent duplicate submissions from adding items twice.
+
+Include camera permission handling, image previews, upload limits, file validation, progress indicators, retry options, and manual entry as a fallback.
+
+Avoid retaining uploaded receipt or food images unnecessarily. Explain processing and retention clearly to the user.
+
+6. PROTEIN AND FIBER INFORMATION
+
+Expand recipe nutrition beyond calories.
+
+Show:
+- Calories in kcal.
+- Protein in grams.
+- Fiber in grams.
+- Carbohydrates and fat when reliable data is available.
+
+Display nutrition on recipe cards and recipe detail pages. Clearly distinguish “per serving” from “whole recipe,” and show the serving count.
+
+Calculate recipe nutrition from ingredient quantities using a reputable nutrition data source where possible. Account for units and serving sizes.
+
+Label calculated values as estimates. Show “Not available” when data is missing rather than inventing numbers or displaying zero.
+
+Add:
+- High-protein and high-fiber recipe filters with documented thresholds.
+- Optional protein and fiber goals in settings.
+- Nutrition-aware recommendations from the AI assistant.
+
+Do not show a daily intake total based only on planned meals or inventory. If you implement daily totals, provide an explicit “Log as eaten” action and calculate totals from logged servings.
+
+7. DESIGN AND USER EXPERIENCE
+
+Keep the existing Pantri branding, colors, typography, and overall style.
+
+Add:
+- Authentication screens.
+- Account/profile settings.
+- Personalized greeting.
+- AI assistant panel.
+- Scan/upload button.
+- Scan-results review screen.
+- Protein and fiber labels on recipes.
+
+Make all new features responsive, keyboard accessible, and easy to use on phones. Include empty states, loading states, confirmation dialogs, and clear success/error feedback.
+
+8. IMPLEMENTATION AND TESTING
+
+Start by inspecting the project and proposing a short implementation plan, including the authentication, database, AI, scanning, and nutrition services you intend to use.
+
+Then implement in phases:
+1. Authentication and account-based database storage.
+2. Personalized greetings.
+3. Nutrition information.
+4. AI assistant.
+5. Receipt and photo scanning.
+
+Run available type checks, builds, and tests after each phase.
+
+Verify:
+- Users cannot access another user’s data.
+- Sessions and logout work correctly.
+- Existing local data imports only with consent.
+- Greetings use the correct local time and display name.
+- AI actions require confirmation.
+- Scan results can be edited before saving.
+- Duplicate imports are prevented.
+- Nutrition units and serving calculations are correct.
+- Missing credentials and service failures produce honest, useful errors.
+
+At the end, summarize:
+- What is fully implemented and tested.
+- What still requires credentials or external setup.
+- Any limitations or recurring service costs.
+- Exact steps I need to take to enable Google, Apple, AI, scanning, and nutrition integrations.
+
+Do not remove working features, replace real integrations with fake responses, or call the app production-ready before testing the full flows.

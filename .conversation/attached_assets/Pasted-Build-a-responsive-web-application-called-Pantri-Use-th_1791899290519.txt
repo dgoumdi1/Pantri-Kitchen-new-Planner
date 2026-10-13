@@ -1,0 +1,96 @@
+Build a responsive web application called “Pantri.”
+
+Use the attached Figma screenshot as the main visual reference. Match its layout, colors, spacing, typography, card design, buttons, navigation, icons, and mobile-first style as closely as possible. Do not copy any branding from the screenshot if it is different from Pantri. Use the name “Pantri” throughout the app.
+
+Purpose:
+Pantri is a kitchen inventory and meal-planning app. It helps users keep track of food in their pantry, refrigerator, and freezer; find meals they can make using food they already own; and create a shopping list for missing ingredients.
+
+Technology:
+- Build with React and TypeScript.
+- Use a clean component-based structure.
+- Use responsive CSS so it works well on both phone and desktop.
+- Use localStorage for the first version so data remains after refresh.
+- Do not require login, payment, external APIs, or a database in this first version.
+- Create sample data so the app looks complete when first opened.
+
+Create these pages/screens:
+
+1. Dashboard / My Pantry
+- Show a friendly header: “Good morning” and the Pantri logo/name.
+- Show summary cards for Pantry, Fridge, and Freezer.
+- Show a list of food items with name, quantity, location, and expiration date.
+- Include a prominent “Add Item” button.
+- Allow users to edit and delete each item.
+- Include simple filters for Pantry, Fridge, and Freezer.
+- Show an “Expiring Soon” section using sample items.
+
+2. Add Food Item
+- Create a form with:
+  - Food name
+  - Quantity
+  - Unit, such as kg, lb, pieces, or liters
+  - Storage location: Pantry, Fridge, or Freezer
+  - Expiration date
+- Validate that food name and quantity are required.
+- When saved, add the item to the inventory and return to the inventory screen.
+- Provide Cancel and Save buttons.
+
+3. Recipe Suggestions
+- Add at least 10 sample recipes.
+- Each recipe must have:
+  - Recipe title
+  - Image placeholder or food icon
+  - Ingredients
+  - Calories
+  - Dietary tags
+  - Simple instructions
+- Compare recipe ingredients against the user's inventory.
+- Rank recipes by the number of ingredients the user already has.
+- Clearly show:
+  - “You have all ingredients”
+  - “Missing 1 ingredient”
+  - “Missing 2 ingredients”
+- Include a button: “Add Missing Items to Shopping List.”
+
+4. Dietary Filters
+- Allow users to filter recipes by:
+  - Halal
+  - Vegan
+  - Vegetarian
+  - Lactose-Free
+- Let users select more than one filter.
+- Only show recipes that match all selected filters.
+- Include a Clear Filters button.
+
+5. Shopping List
+- Show items manually added by the user and missing ingredients added from recipes.
+- Each item should have a checkbox.
+- Checked items should move to a “Purchased” section or look completed.
+- Allow users to add and delete shopping-list items.
+- Keep the shopping list saved in localStorage.
+
+6. Navigation
+- Add a bottom navigation bar on mobile and a sidebar or top navigation on desktop.
+- Include Dashboard, Recipes, Shopping List, and Settings.
+- Use clear icons and accessible labels.
+
+Design requirements:
+- Use a modern, friendly, clean kitchen/food-app look.
+- Use warm white backgrounds, muted green as the primary action color, and soft neutral accent colors.
+- Use rounded cards, readable fonts, generous spacing, and high contrast.
+- Keep the interface simple and not crowded.
+- Make buttons and inputs accessible.
+- Match the attached Figma screenshot closely while preserving usability.
+
+Important implementation rules:
+- Create real working add, edit, delete, filter, recipe-match, and shopping-list interactions.
+- Save inventory, preferences, and shopping-list data in localStorage.
+- Start with well-organized sample data and reusable components.
+- Do not claim barcode scanning, receipt scanning, AI, external recipe APIs, authentication, or calorie tracking are implemented unless you actually build them.
+- Add a README explaining how the app works, the feature list, and how to run it.
+
+At the end, show me:
+1. The app preview.
+2. The folder structure.
+3. A checklist of what is implemented.
+4. Any features that are only placeholders or still need work.

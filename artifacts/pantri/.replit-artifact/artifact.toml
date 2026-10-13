@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Pantri"
+description = "A responsive kitchen inventory and meal-planning app that helps people track pantry, fridge, and freezer items, find recipes from ingredients on hand, and manage a shopping list. Local browser storage keeps inventory, preferences, and list data between visits."
+version = "1.0.0"
+id = "artifacts/pantri"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19987
+
+[services.development]
+run = "pnpm --filter @workspace/pantri run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/pantri", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/pantri/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19987"
+BASE_PATH = "/"

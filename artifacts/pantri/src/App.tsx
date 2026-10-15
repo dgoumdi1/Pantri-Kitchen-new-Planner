@@ -1,26 +1,203 @@
-import { useMemo, useState, type ReactNode } from 'react';
-import { Link, Route, Switch, Router as WouterRouter } from 'wouter';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Link, Redirect, Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
+import { ClerkProvider, SignIn, SignUp, useAuth, useClerk, useUser } from '@clerk/react';
+import { publishableKeyFromHost } from '@clerk/react/internal';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Apple, Archive, CalendarDays, Check, ChefHat, CircleAlert, Clock3, Egg, Fish, Leaf, Milk, Pencil, Plus, Refrigerator, Search, ShoppingBasket, Snowflake, Sparkles, Trash2, Wheat, X } from 'lucide-react';
 import { Navigation } from './components/Navigation';
 import { FoodItemDialog } from './components/FoodItemDialog';
+import { AssistantPage } from './pages/AssistantPage';
 import { recipes, matchesInventory } from './data/recipes';
-import { readData, saveData } from './lib/storage';
+import { readLegacyData } from './lib/storage';
 import type { AppData, FoodItem, Preferences, Recipe, ShoppingItem } from './lib/types';
+import {
+  getGetMyDataQueryKey,
+  useDeleteMyAccountData,
+  useGetMyData,
+  useImportMyData,
+  useSaveMyData,
+  type AccountData,
+  type AssistantAction,
+  type GeneratedRecipe,
+} from '@workspace/api-client-react';
 
 const dietaryChoices = ['Halal', 'Vegan', 'Vegetarian', 'Lactose-Free'];
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const formatDate = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: 5_000, refetchOnWindowFocus: true } },
+});
+
+const emptyData = (): AppData => ({
+  inventory: [],
+  shopping: [],
+  preferences: { dietaryFilters: [], householdSize: 2, units: 'Metric', expirationReminders: true },
+  savedRecipes: [],
+  mealPlan: [],
+});
+
+function toApiData(data: AppData): AccountData {
+  return {
+    ...data,
+    inventory: data.inventory.map((item) => ({ ...item, expirationDate: item.expirationDate || null })),
+  };
+}
+
+function fromApiData(data: AccountData): AppData {
+  return {
+    ...data,
+    inventory: data.inventory.map((item) => ({ ...item, expirationDate: item.expirationDate ?? '' })),
+  };
+}
+
+function greetingFor(name: string | undefined, date: Date): string {
+  if (!name?.trim()) return 'Welcome to Pantri';
+  const hour = date.getHours();
+  const greeting = hour >= 5 && hour < 12 ? 'Good morning' : hour >= 12 && hour < 17 ? 'Good afternoon' : 'Good evening';
+  return `${greeting}, ${name.trim()}`;
+}
+
+function useLocalGreeting(name: string | undefined) {
+  const [greeting, setGreeting] = useState(() => greetingFor(name, new Date()));
+  useEffect(() => {
+    let timer = 0;
+    const refresh = () => {
+      window.clearTimeout(timer);
+      const now = new Date();
+      setGreeting(greetingFor(name, now));
+      const nextHour = new Date(now);
+      nextHour.setMinutes(0, 0, 0);
+      nextHour.setHours(nextHour.getHours() + 1);
+      timer = window.setTimeout(refresh, Math.max(250, nextHour.getTime() - now.getTime() + 25));
+    };
+    const onVisibility = () => { if (document.visibilityState === 'visible') refresh(); };
+    refresh();
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [name]);
+  return greeting;
+}
 
 function App() {
-  const [data, setData] = useState<AppData>(() => readData());
+  return (
+    <WouterRouter base={basePath}>
+      <ClerkProviderWithRoutes />
+    </WouterRouter>
+  );
+}
+
+function ClerkProviderWithRoutes() {
+  const [, setLocation] = useLocation();
+  return (
+    <ClerkProvider
+      publishableKey={clerkPubKey}
+      proxyUrl={clerkProxyUrl}
+      signInUrl={`${basePath}/sign-in`}
+      signUpUrl={`${basePath}/sign-up`}
+      appearance={{ variables: { colorPrimary: '#397456', colorBackground: '#fffdf8', colorForeground: '#30453a', borderRadius: '14px' } }}
+      routerPush={(to) => setLocation(stripBase(to))}
+      routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+    >
+      <QueryClientProvider client={queryClient}>
+        <ClerkCacheInvalidator />
+        <Switch>
+          <Route path="/sign-in/*?">
+            <AuthPage mode="sign-in" />
+          </Route>
+          <Route path="/sign-up/*?">
+            <AuthPage mode="sign-up" />
+          </Route>
+          <Route>
+            <PrivatePantri />
+          </Route>
+        </Switch>
+      </QueryClientProvider>
+    </ClerkProvider>
+  );
+}
+
+function stripBase(path: string): string {
+  return basePath && path.startsWith(basePath) ? path.slice(basePath.length) || '/' : path;
+}
+
+function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
+  return (
+    <div className="auth-screen">
+      <div className="auth-brand"><span className="brand-mark"><Leaf size={19} /></span><span>Pantri</span></div>
+      <p className="auth-copy">A little more joy, less waste.</p>
+      {mode === 'sign-in'
+        ? <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
+        : <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />}
+    </div>
+  );
+}
+
+function ClerkCacheInvalidator() {
+  const { addListener } = useClerk();
+  const cache = useQueryClient();
+  useEffect(() => {
+    let previous: string | null | undefined;
+    return addListener(({ user }) => {
+      const next = user?.id ?? null;
+      if (previous !== undefined && previous !== next) cache.clear();
+      previous = next;
+    });
+  }, [addListener, cache]);
+  return null;
+}
+
+function PrivatePantri() {
+  const { isLoaded, isSignedIn } = useAuth();
+  if (!isLoaded) return <div className="auth-loading" role="status">Loading your kitchen…</div>;
+  if (!isSignedIn) return <Redirect to={`${basePath}/sign-in`} />;
+  return <PantriApp />;
+}
+
+function PantriApp() {
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const cache = useQueryClient();
+  const dataQuery = useGetMyData();
+  const saveMutation = useSaveMyData();
+  const importMutation = useImportMyData();
+  const deleteAccountMutation = useDeleteMyAccountData();
   const [showFoodDialog, setShowFoodDialog] = useState(false);
   const [editingFood, setEditingFood] = useState<FoodItem | undefined>();
   const [toast, setToast] = useState('');
+  const [showImportPrompt, setShowImportPrompt] = useState(false);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importError, setImportError] = useState('');
+  const legacyData = useRef<AppData | null>(readLegacyData());
+  const accountId = user?.id ?? '';
+  const data = dataQuery.data ? fromApiData(dataQuery.data) : emptyData();
+  const displayName = user?.fullName || user?.firstName || undefined;
+  const greeting = useLocalGreeting(displayName);
+
+  useEffect(() => {
+    if (!accountId || !dataQuery.isSuccess || !legacyData.current) return;
+    const imported = localStorage.getItem(`pantri-imported:${accountId}`);
+    const dismissed = localStorage.getItem(`pantri-import-dismissed:${accountId}`);
+    if (!imported && !dismissed) setShowImportPrompt(true);
+  }, [accountId, dataQuery.isSuccess]);
+
+  const persistData = async (next: AppData) => {
+    const saved = await saveMutation.mutateAsync({ data: toApiData(next) });
+    cache.setQueryData(getGetMyDataQueryKey(), saved);
+  };
 
   const updateData = (next: AppData) => {
-    setData(next);
-    saveData(next);
+    void persistData(next).catch((error: unknown) => {
+      notify(error instanceof Error ? error.message : 'Your changes could not be saved. Please retry.');
+    });
   };
   const notify = (message: string) => {
     setToast(message);
@@ -45,25 +222,75 @@ function App() {
   };
   const changePreferences = (preferences: Preferences) => updateData({ ...data, preferences });
   const addShopping = (item: Omit<ShoppingItem, 'id'>) => {
-    setData((current) => {
-      const exists = current.shopping.some((entry) => entry.name.toLowerCase() === item.name.toLowerCase() && !entry.checked);
-      if (exists) return current;
-      const next = { ...current, shopping: [...current.shopping, { ...item, id: createId() }] };
-      saveData(next);
-      return next;
-    });
+    const exists = data.shopping.some((entry) => entry.name.toLowerCase() === item.name.toLowerCase() && !entry.checked);
+    if (exists) return;
+    updateData({ ...data, shopping: [...data.shopping, { ...item, id: createId() }] });
   };
   const toggleShopping = (id: string) => updateData({ ...data, shopping: data.shopping.map((item) => item.id === id ? { ...item, checked: !item.checked } : item) });
   const deleteShopping = (id: string) => updateData({ ...data, shopping: data.shopping.filter((item) => item.id !== id) });
 
+  const applyAssistantAction = async (action: AssistantAction) => {
+    if (action.type === 'add_inventory') {
+      const exists = data.inventory.some((item) => item.name.trim().toLowerCase() === action.name.trim().toLowerCase());
+      if (exists) throw new Error(`${action.name} is already in your kitchen. Review the existing item instead.`);
+      await persistData({ ...data, inventory: [{ id: createId(), name: action.name, quantity: action.quantity, unit: action.unit, location: action.location, expirationDate: '' }, ...data.inventory] });
+      return;
+    }
+    if (data.shopping.some((item) => item.name.trim().toLowerCase() === action.name.trim().toLowerCase() && !item.checked)) return;
+    await persistData({ ...data, shopping: [...data.shopping, { id: createId(), name: action.name, quantity: action.quantity, unit: action.unit, checked: false }] });
+  };
+
+  const saveGeneratedRecipe = async (recipe: GeneratedRecipe) => {
+    if (data.savedRecipes.some((saved) => saved.title.trim().toLowerCase() === recipe.title.trim().toLowerCase())) {
+      throw new Error('A recipe with this title is already saved.');
+    }
+    await persistData({ ...data, savedRecipes: [recipe, ...data.savedRecipes] });
+  };
+
+  const importLegacy = async () => {
+    if (!legacyData.current || !accountId) return;
+    setImportBusy(true);
+    setImportError('');
+    let requestId = localStorage.getItem(`pantri-import-request:${accountId}`);
+    if (!requestId) {
+      requestId = crypto.randomUUID();
+      localStorage.setItem(`pantri-import-request:${accountId}`, requestId);
+    }
+    try {
+      const imported = await importMutation.mutateAsync({ data: { requestId, data: toApiData(legacyData.current) } });
+      cache.setQueryData(getGetMyDataQueryKey(), imported);
+      localStorage.setItem(`pantri-imported:${accountId}`, '1');
+      setShowImportPrompt(false);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'The import did not finish. Please retry.');
+    } finally {
+      setImportBusy(false);
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (!user || !window.confirm('Delete your Pantri account and all saved kitchen data? This cannot be undone.')) return;
+    await deleteAccountMutation.mutateAsync();
+    await user.delete();
+    await signOut({ redirectUrl: basePath || '/' });
+    cache.clear();
+  };
+
+  const updateDisplayName = async (name: string) => {
+    const parts = name.trim().split(/\s+/);
+    await user?.update({ firstName: parts[0] || '', lastName: parts.slice(1).join(' ') });
+  };
+
+  if (dataQuery.isLoading) return <div className="auth-loading" role="status">Opening your kitchen…</div>;
+  if (dataQuery.isError) return <div className="auth-loading" role="alert">Your kitchen could not be loaded. <button className="button button-outline" onClick={() => void dataQuery.refetch()}>Try again</button></div>;
+
   return (
-    <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
       <div className="app-shell">
         <Navigation />
         <main className="app-main">
           <Switch>
             <Route path="/">
-              <Dashboard data={data} onAdd={openAdd} onEdit={openEdit} onDelete={deleteFood} />
+              <Dashboard data={data} greeting={greeting} onAdd={openAdd} onEdit={openEdit} onDelete={deleteFood} />
             </Route>
             <Route path="/recipes">
               <RecipesPage data={data} onPreferences={changePreferences} onAddShopping={addShopping} notify={notify} />
@@ -71,22 +298,30 @@ function App() {
             <Route path="/shopping">
               <ShoppingPage data={data} onAdd={addShopping} onToggle={toggleShopping} onDelete={deleteShopping} />
             </Route>
+            <Route path="/assistant">
+              <AssistantPage data={toApiData(data)} userId={accountId} onApplyAction={applyAssistantAction} onSaveRecipe={saveGeneratedRecipe} onManualEntry={openAdd} />
+            </Route>
             <Route path="/settings">
-              <SettingsPage preferences={data.preferences} onChange={changePreferences} />
+              <SettingsPage preferences={data.preferences} onChange={changePreferences} displayName={displayName ?? ''} onSaveName={updateDisplayName} onDeleteAccount={deleteAccount} onSignOut={() => void signOut({ redirectUrl: basePath || '/' })} />
             </Route>
             <Route>
               <NotFound />
             </Route>
           </Switch>
         </main>
+        {showImportPrompt && legacyData.current && <div className="import-banner" role="dialog" aria-labelledby="import-title" data-testid="dialog-import-legacy">
+          <div><strong id="import-title">Bring your browser kitchen into this account?</strong><p>{legacyData.current.inventory.length} foods, {legacyData.current.shopping.length} shopping items, and your preferences are saved in this browser. This may include Pantri sample items. Nothing is imported until you choose.</p>
+            {importError && <div className="form-error" role="alert">{importError}</div>}
+          </div>
+          <div className="import-actions"><button className="button button-primary" onClick={() => void importLegacy()} disabled={importBusy} data-testid="button-import-legacy">{importBusy ? 'Importing…' : 'Review and import'}</button><button className="button button-outline" onClick={() => { localStorage.setItem(`pantri-import-dismissed:${accountId}`, '1'); setShowImportPrompt(false); }} disabled={importBusy} data-testid="button-skip-import">Not now</button></div>
+        </div>}
         {showFoodDialog && <FoodItemDialog item={editingFood} onClose={() => { setShowFoodDialog(false); setEditingFood(undefined); }} onSave={saveFood} />}
         {toast && <div className="toast-note" role="status" data-testid="status-toast">{toast}</div>}
       </div>
-    </WouterRouter>
   );
 }
 
-function Dashboard({ data, onAdd, onEdit, onDelete }: { data: AppData; onAdd: () => void; onEdit: (item: FoodItem) => void; onDelete: (id: string) => void }) {
+function Dashboard({ data, greeting, onAdd, onEdit, onDelete }: { data: AppData; greeting: string; onAdd: () => void; onEdit: (item: FoodItem) => void; onDelete: (id: string) => void }) {
   const [location, setLocation] = useState('All');
   const countAt = (place: string) => data.inventory.filter((item) => item.location === place).length;
   const inventory = data.inventory.filter((item) => location === 'All' || item.location === location);
@@ -102,7 +337,7 @@ function Dashboard({ data, onAdd, onEdit, onDelete }: { data: AppData; onAdd: ()
       <div className="page-head">
         <div>
           <div className="eyebrow">A fresh start in your kitchen</div>
-          <h1 className="page-title">Good morning, cook.</h1>
+          <h1 className="page-title" data-testid="text-dashboard-greeting">{greeting}</h1>
           <p className="page-subtitle">Here’s what’s waiting in your kitchen today.</p>
         </div>
         <button className="button button-primary" onClick={onAdd} data-testid="button-add-food"><Plus size={17} /> Add item</button>
@@ -337,8 +572,38 @@ function ShoppingRow({ item, onToggle, onDelete }: { item: ShoppingItem; onToggl
   );
 }
 
-function SettingsPage({ preferences, onChange }: { preferences: Preferences; onChange: (preferences: Preferences) => void }) {
+function SettingsPage({ preferences, onChange, displayName, onSaveName, onDeleteAccount, onSignOut }: {
+  preferences: Preferences;
+  onChange: (preferences: Preferences) => void;
+  displayName: string;
+  onSaveName: (name: string) => Promise<void>;
+  onDeleteAccount: () => Promise<void>;
+  onSignOut: () => void;
+}) {
+  const [name, setName] = useState(displayName);
+  const [nameSaving, setNameSaving] = useState(false);
+  const [accountError, setAccountError] = useState('');
+  useEffect(() => setName(displayName), [displayName]);
   const update = (field: keyof Preferences, value: Preferences[keyof Preferences]) => onChange({ ...preferences, [field]: value });
+  const saveName = async () => {
+    setNameSaving(true);
+    setAccountError('');
+    try {
+      await onSaveName(name);
+    } catch (error) {
+      setAccountError(error instanceof Error ? error.message : 'Your name could not be saved.');
+    } finally {
+      setNameSaving(false);
+    }
+  };
+  const removeAccount = async () => {
+    setAccountError('');
+    try {
+      await onDeleteAccount();
+    } catch (error) {
+      setAccountError(error instanceof Error ? error.message : 'Your account could not be deleted.');
+    }
+  };
   return (
     <>
       <div className="page-head"><div><div className="eyebrow">Make Pantri feel like yours</div><h1 className="page-title">A few preferences</h1><p className="page-subtitle">Small details to make meal planning fit your home.</p></div></div>
@@ -359,10 +624,18 @@ function SettingsPage({ preferences, onChange }: { preferences: Preferences; onC
           <div className="setting-row"><div><label htmlFor="expiration-reminders">Use-soon reminders</label><div style={{ color: '#87948a', fontSize: 12, marginTop: 3 }}>Show food close to its expiration date.</div></div><input id="expiration-reminders" className="check-input" type="checkbox" checked={preferences.expirationReminders} onChange={(event) => update('expirationReminders', event.target.checked)} data-testid="toggle-expiration-reminders" /></div>
         </section>
         <section className="panel settings-card">
-          <h2 className="settings-title">Your kitchen, your data</h2>
-          <p className="settings-description">Pantri saves your inventory, shopping list, and preferences on this device only.</p>
-          <button className="button button-outline" onClick={() => { if (window.confirm('Restore the original sample kitchen? Your current items and preferences will be replaced.')) { localStorage.removeItem('pantri-app-data-v1'); window.location.reload(); } }} data-testid="button-reset-data"><Archive size={15} /> Restore sample kitchen</button>
-          <span role="status" style={{ marginLeft: 12, color: '#718276', fontSize: 12 }} data-testid="text-settings-saved"><Sparkles size={13} style={{ display: 'inline' }} /> Saved automatically</span>
+          <h2 className="settings-title">Your account</h2>
+          <p className="settings-description">Your kitchen and preferences sync to your account across devices.</p>
+          <div className="field" style={{ maxWidth: 460 }}>
+            <label htmlFor="display-name">Display name</label>
+            <input id="display-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={100} data-testid="input-display-name" />
+            <button className="button button-outline button-small" onClick={() => void saveName()} disabled={nameSaving || !name.trim()} data-testid="button-save-display-name">{nameSaving ? 'Saving…' : 'Save name'}</button>
+          </div>
+          <div className="account-actions">
+            <button className="button button-outline" onClick={onSignOut} data-testid="button-sign-out">Sign out</button>
+            <button className="button button-danger" onClick={() => void removeAccount()} data-testid="button-delete-account">Delete account and data</button>
+          </div>
+          {accountError && <div className="form-error" role="alert" data-testid="error-account-action">{accountError}</div>}
         </section>
       </div>
     </>

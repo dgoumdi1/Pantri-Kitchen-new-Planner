@@ -1,3 +1,5 @@
+import type { MealPlanItem, SavedRecipe } from '@workspace/api-client-react';
+
 export type Location = 'Pantry' | 'Fridge' | 'Freezer';
 
 export type FoodItem = {
@@ -23,10 +25,10 @@ export type Recipe = {
 export type ShoppingItem = {
   id: string;
   name: string;
-  quantity?: number;
-  unit?: string;
+  quantity?: number | null;
+  unit?: string | null;
   checked: boolean;
-  sourceRecipe?: string;
+  sourceRecipe?: string | null;
 };
 
 export type Preferences = {
@@ -40,4 +42,6 @@ export type AppData = {
   inventory: FoodItem[];
   shopping: ShoppingItem[];
   preferences: Preferences;
+  savedRecipes: SavedRecipe[];
+  mealPlan: MealPlanItem[];
 };

@@ -30,21 +30,25 @@ export const seedData: AppData = {
     { id: 'seed-shopping-3', name: 'Fresh basil', quantity: 1, unit: 'bunch', checked: true },
   ],
   preferences: { dietaryFilters: [], householdSize: 2, units: 'Metric', expirationReminders: true },
+  savedRecipes: [],
+  mealPlan: [],
 };
 
-export function readData(): AppData {
+export function readLegacyData(): AppData | null {
   try {
     const stored = localStorage.getItem(KEY);
-    if (stored) return { ...seedData, ...JSON.parse(stored) as Partial<AppData> };
+    if (!stored) return null;
+    const parsed = JSON.parse(stored) as Partial<AppData>;
+    return {
+      ...seedData,
+      ...parsed,
+      preferences: { ...seedData.preferences, ...parsed.preferences },
+      savedRecipes: parsed.savedRecipes ?? [],
+      mealPlan: parsed.mealPlan ?? [],
+    };
   } catch {
-    // Start with a clean sample kitchen if local data cannot be read.
+    return null;
   }
-  localStorage.setItem(KEY, JSON.stringify(seedData));
-  return seedData;
-}
-
-export function saveData(data: AppData) {
-  localStorage.setItem(KEY, JSON.stringify(data));
 }
 
 export type { FoodItem, Preferences, ShoppingItem };

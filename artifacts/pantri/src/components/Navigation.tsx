@@ -1,15 +1,19 @@
 import { Link, useLocation } from 'wouter';
-import { House, CookingPot, ShoppingBasket, Settings, Leaf } from 'lucide-react';
+import { House, CookingPot, ShoppingBasket, Settings, Leaf, Sparkles, LogOut } from 'lucide-react';
+import { useClerk, useUser } from '@clerk/react';
 
 const links = [
   { href: '/', label: 'Dashboard', icon: House },
   { href: '/recipes', label: 'Recipes', icon: CookingPot },
+  { href: '/assistant', label: 'Assistant', icon: Sparkles },
   { href: '/shopping', label: 'Shopping List', icon: ShoppingBasket },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export function Navigation() {
   const [location] = useLocation();
+  const { user } = useUser();
+  const { signOut } = useClerk();
   return (
     <>
       <header className="topbar">
@@ -25,7 +29,10 @@ export function Navigation() {
             </Link>
           ))}
         </nav>
-        <div className="eyebrow" style={{ letterSpacing: '.4px', textTransform: 'none' }}>A little more joy, less waste</div>
+        <div className="nav-account">
+          <span className="eyebrow" style={{ letterSpacing: '.4px', textTransform: 'none' }}>{user?.firstName || 'Your kitchen'}</span>
+          <button className="icon-button" onClick={() => void signOut({ redirectUrl: import.meta.env.BASE_URL })} aria-label="Sign out" data-testid="button-nav-sign-out"><LogOut size={16} /></button>
+        </div>
       </header>
       <nav className="mobile-nav" aria-label="Mobile navigation">
         {links.map(({ href, label, icon: Icon }) => (

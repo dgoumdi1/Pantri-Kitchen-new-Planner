@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter } from "express";
 import { getAuth } from "@clerk/express";
-import { rateLimit } from "express-rate-limit";
+import { ipKeyGenerator, rateLimit } from "express-rate-limit";
 import { and, desc, eq } from "drizzle-orm";
 import {
   AnalyzeKitchenImageBody,
@@ -28,6 +28,7 @@ const sharedFreeTierLimit = rateLimit({
   standardHeaders: "draft-8",
   legacyHeaders: false,
   keyGenerator: () => "pantri-gemini-free-tier",
+  skip: (req) => !getAuth(req).userId,
   handler: (_req, res) => {
     res.status(429).json({
       errorCode: "gemini_app_quota",
@@ -43,7 +44,10 @@ function freeTierLimit(limit: number, message: string) {
     limit,
     standardHeaders: "draft-8",
     legacyHeaders: false,
-    keyGenerator: (req) => getAuth(req).userId ?? req.ip ?? "anonymous",
+    keyGenerator: (req) => {
+      const userId = getAuth(req).userId;
+      return userId ?? ipKeyGenerator(req.ip ?? "anonymous");
+    },
     handler: (_req, res) => {
       res.status(429).json({
         errorCode: "app_limit",

@@ -18,15 +18,14 @@ export function getGeminiFailure(error: unknown): {
   errorCode: string;
   message: string;
 } {
-  const detail =
-    typeof error === "object" && error !== null
-      ? (error as { status?: unknown; code?: unknown; message?: unknown })
-      : {};
-  const status = Number(detail.status ?? detail.code ?? 0);
-  const text = String(detail.message ?? error ?? "").toLowerCase();
+  const details = getGeminiErrorDetails(error);
+  const status = details.status;
+  const text = details.message.toLowerCase();
+  const code = details.code.toLowerCase();
 
   if (
     status === 429 ||
+    code.includes("resource_exhausted") ||
     text.includes("resource_exhausted") ||
     text.includes("quota") ||
     text.includes("rate limit")
@@ -38,7 +37,13 @@ export function getGeminiFailure(error: unknown): {
         "Gemini's free-tier quota is currently exhausted. Please wait for the quota to reset and try again. Pantri will not switch to a paid service.",
     };
   }
-  if (status === 401 || status === 403 || text.includes("api key")) {
+  if (
+    status === 401 ||
+    status === 403 ||
+    code.includes("unauthenticated") ||
+    code.includes("permission_denied") ||
+    text.includes("api key")
+  ) {
     return {
       status: 503,
       errorCode: "gemini_key_invalid",
@@ -46,11 +51,60 @@ export function getGeminiFailure(error: unknown): {
         "Gemini could not authenticate this request. Check GEMINI_API_KEY in Replit Secrets.",
     };
   }
+  if (status === 400 || status === 404 || code.includes("invalid_argument")) {
+    return {
+      status: 502,
+      errorCode: "gemini_request_rejected",
+      message:
+        "Google rejected this scan request. Try another JPEG, PNG, or WebP image, or use manual entry.",
+    };
+  }
   return {
     status: 502,
     errorCode: "gemini_unavailable",
     message:
       "Gemini is temporarily unavailable. You can retry or continue with manual entry.",
+  };
+}
+
+export function getGeminiErrorDetails(error: unknown): {
+  name: string;
+  status: number;
+  code: string;
+  message: string;
+} {
+  const detail =
+    typeof error === "object" && error !== null
+      ? (error as {
+          name?: unknown;
+          status?: unknown;
+          statusCode?: unknown;
+          code?: unknown;
+          message?: unknown;
+          response?: {
+            status?: unknown;
+            data?: { error?: { status?: unknown; message?: unknown } };
+          };
+        })
+      : {};
+  const statusValue =
+    detail.status ?? detail.statusCode ?? detail.response?.status ?? 0;
+  const status = Number(statusValue) || 0;
+  const code = String(
+    detail.code ?? detail.response?.data?.error?.status ?? "",
+  ).slice(0, 80);
+  const message = String(
+    detail.message ?? detail.response?.data?.error?.message ?? "",
+  )
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]")
+    .replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
+    .replace(/(api[_ -]?key\s*[:=]\s*)\S+/gi, "$1[redacted]")
+    .slice(0, 300);
+  return {
+    name: String(detail.name ?? "UnknownError").slice(0, 80),
+    status,
+    code,
+    message,
   };
 }
 

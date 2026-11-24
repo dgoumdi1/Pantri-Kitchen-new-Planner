@@ -18,7 +18,13 @@ import {
   pantriAccountDataTable,
   pantriAssistantMessagesTable,
 } from "@workspace/db";
-import { getGeminiClient, getGeminiFailure, getJsonText, GEMINI_MODEL } from "../lib/gemini";
+import {
+  getGeminiClient,
+  getGeminiErrorDetails,
+  getGeminiFailure,
+  getJsonText,
+  GEMINI_MODEL,
+} from "../lib/gemini";
 
 const router: IRouter = Router();
 const oneHour = 60 * 60 * 1000;
@@ -102,9 +108,17 @@ function sendGeminiError(req: Parameters<typeof getAuth>[0], res: import("expres
     });
     return;
   }
+  const details = getGeminiErrorDetails(error);
   const mapped = getGeminiFailure(error);
   req.log.warn(
-    { status: mapped.status, errorCode: mapped.errorCode },
+    {
+      status: mapped.status,
+      errorCode: mapped.errorCode,
+      upstreamName: details.name,
+      upstreamStatus: details.status,
+      upstreamCode: details.code,
+      upstreamMessage: details.message,
+    },
     "Gemini request failed",
   );
   res.status(mapped.status).json({

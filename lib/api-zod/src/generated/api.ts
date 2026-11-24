@@ -81,7 +81,8 @@ export const GetMyDataResponse = zod.object({
   "quantity": zod.number().min(getMyDataResponseInventoryItemQuantityMin),
   "unit": zod.string().max(getMyDataResponseInventoryItemUnitMax),
   "location": zod.enum(['Pantry', 'Fridge', 'Freezer']),
-  "expirationDate": zod.coerce.date().nullable()
+  "expirationDate": zod.coerce.date().nullable(),
+  "category": zod.enum(['Fruit', 'Vegetable', 'Dairy', 'Meat', 'Seafood', 'Grains', 'Bakery', 'Frozen', 'Condiment', 'Beverage', 'Snack', 'Other']).nullish()
 })),
   "shopping": zod.array(zod.object({
   "id": zod.string().min(1),
@@ -193,7 +194,8 @@ export const SaveMyDataBody = zod.object({
   "quantity": zod.number().min(saveMyDataBodyInventoryItemQuantityMin),
   "unit": zod.string().max(saveMyDataBodyInventoryItemUnitMax),
   "location": zod.enum(['Pantry', 'Fridge', 'Freezer']),
-  "expirationDate": zod.coerce.date().nullable()
+  "expirationDate": zod.coerce.date().nullable(),
+  "category": zod.enum(['Fruit', 'Vegetable', 'Dairy', 'Meat', 'Seafood', 'Grains', 'Bakery', 'Frozen', 'Condiment', 'Beverage', 'Snack', 'Other']).nullish()
 })),
   "shopping": zod.array(zod.object({
   "id": zod.string().min(1),
@@ -301,7 +303,8 @@ export const SaveMyDataResponse = zod.object({
   "quantity": zod.number().min(saveMyDataResponseInventoryItemQuantityMin),
   "unit": zod.string().max(saveMyDataResponseInventoryItemUnitMax),
   "location": zod.enum(['Pantry', 'Fridge', 'Freezer']),
-  "expirationDate": zod.coerce.date().nullable()
+  "expirationDate": zod.coerce.date().nullable(),
+  "category": zod.enum(['Fruit', 'Vegetable', 'Dairy', 'Meat', 'Seafood', 'Grains', 'Bakery', 'Frozen', 'Condiment', 'Beverage', 'Snack', 'Other']).nullish()
 })),
   "shopping": zod.array(zod.object({
   "id": zod.string().min(1),
@@ -418,7 +421,8 @@ export const ImportMyDataBody = zod.object({
   "quantity": zod.number().min(importMyDataBodyDataInventoryItemQuantityMin),
   "unit": zod.string().max(importMyDataBodyDataInventoryItemUnitMax),
   "location": zod.enum(['Pantry', 'Fridge', 'Freezer']),
-  "expirationDate": zod.coerce.date().nullable()
+  "expirationDate": zod.coerce.date().nullable(),
+  "category": zod.enum(['Fruit', 'Vegetable', 'Dairy', 'Meat', 'Seafood', 'Grains', 'Bakery', 'Frozen', 'Condiment', 'Beverage', 'Snack', 'Other']).nullish()
 })),
   "shopping": zod.array(zod.object({
   "id": zod.string().min(1),
@@ -527,7 +531,8 @@ export const ImportMyDataResponse = zod.object({
   "quantity": zod.number().min(importMyDataResponseInventoryItemQuantityMin),
   "unit": zod.string().max(importMyDataResponseInventoryItemUnitMax),
   "location": zod.enum(['Pantry', 'Fridge', 'Freezer']),
-  "expirationDate": zod.coerce.date().nullable()
+  "expirationDate": zod.coerce.date().nullable(),
+  "category": zod.enum(['Fruit', 'Vegetable', 'Dairy', 'Meat', 'Seafood', 'Grains', 'Bakery', 'Frozen', 'Condiment', 'Beverage', 'Snack', 'Other']).nullish()
 })),
   "shopping": zod.array(zod.object({
   "id": zod.string().min(1),
@@ -690,6 +695,41 @@ export const GenerateAssistantRecipeResponse = zod.object({
   "caloriesPerServing": zod.number().min(generateAssistantRecipeResponseOneCaloriesPerServingMin).nullish(),
   "proteinGramsPerServing": zod.number().min(generateAssistantRecipeResponseOneProteinGramsPerServingMin).nullish(),
   "fiberGramsPerServing": zod.number().min(generateAssistantRecipeResponseOneFiberGramsPerServingMin).nullish()
+})
+
+
+/**
+ * @summary Interpret reviewed voice transcript text into inventory suggestions
+ */
+export const interpretVoiceIngredientsBodyTranscriptMax = 2000;
+
+
+
+export const InterpretVoiceIngredientsBody = zod.object({
+  "transcript": zod.string().min(1).max(interpretVoiceIngredientsBodyTranscriptMax)
+})
+
+export const interpretVoiceIngredientsResponseItemsItemNameMax = 120;
+
+export const interpretVoiceIngredientsResponseItemsItemQuantityMin = 0;
+
+export const interpretVoiceIngredientsResponseItemsItemUnitMax = 40;
+
+export const interpretVoiceIngredientsResponseItemsItemClarificationNeededMax = 300;
+
+export const interpretVoiceIngredientsResponseItemsMax = 40;
+
+
+
+export const InterpretVoiceIngredientsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "name": zod.string().min(1).max(interpretVoiceIngredientsResponseItemsItemNameMax),
+  "quantity": zod.number().min(interpretVoiceIngredientsResponseItemsItemQuantityMin).nullable(),
+  "unit": zod.string().max(interpretVoiceIngredientsResponseItemsItemUnitMax).nullable(),
+  "category": zod.enum(['Fruit', 'Vegetable', 'Dairy', 'Meat', 'Seafood', 'Grains', 'Bakery', 'Frozen', 'Condiment', 'Beverage', 'Snack', 'Other']),
+  "location": zod.enum(['Pantry', 'Fridge', 'Freezer']),
+  "clarificationNeeded": zod.string().max(interpretVoiceIngredientsResponseItemsItemClarificationNeededMax)
+})).max(interpretVoiceIngredientsResponseItemsMax)
 })
 
 

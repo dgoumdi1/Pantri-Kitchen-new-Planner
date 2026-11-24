@@ -9,6 +9,8 @@ import {
   GenerateAssistantRecipeBody,
   GenerateAssistantRecipeResponse,
   GetAssistantHistoryResponse,
+  InterpretVoiceIngredientsBody,
+  InterpretVoiceIngredientsResponse,
   SendAssistantMessageBody,
   SendAssistantMessageResponse,
   type AccountData,
@@ -347,6 +349,71 @@ router.post("/assistant/recipes", sharedFreeTierLimit, recipeLimit, async (req, 
       fiberGramsPerServing: null,
     });
     res.json(recipe);
+  } catch (error) {
+    sendGeminiError(req, res, error);
+  }
+});
+
+router.post("/assistant/voice-ingredients", sharedFreeTierLimit, scanLimit, async (req, res): Promise<void> => {
+  const userId = getUserId(req);
+  if (!userId) {
+    res.status(401).json({ error: "Sign in to interpret a voice transcript." });
+    return;
+  }
+  const parsed = InterpretVoiceIngredientsBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Enter an editable transcript of up to 2,000 characters." });
+    return;
+  }
+
+  const voiceSchema = {
+    type: "object",
+    properties: {
+      items: {
+        type: "array",
+        maxItems: 40,
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            quantity: { type: ["number", "null"] },
+            unit: { type: ["string", "null"] },
+            category: {
+              type: "string",
+              enum: ["Fruit", "Vegetable", "Dairy", "Meat", "Seafood", "Grains", "Bakery", "Frozen", "Condiment", "Beverage", "Snack", "Other"],
+            },
+            location: { type: "string", enum: ["Pantry", "Fridge", "Freezer"] },
+            clarificationNeeded: { type: "string" },
+          },
+          required: ["name", "quantity", "unit", "category", "location", "clarificationNeeded"],
+        },
+      },
+    },
+    required: ["items"],
+  };
+
+  try {
+    const result = await generateWithTransientRetry(() => getGeminiClient().models.generateContent({
+      model: GEMINI_MODEL,
+      contents: [
+        "Interpret a user's reviewed grocery/ingredient transcript into separate inventory suggestions.",
+        "Preserve explicitly spoken names, quantities, and units exactly where possible.",
+        "Never invent quantities, units, package sizes, expiration dates, or prices.",
+        "If a quantity or unit was not spoken, return null and explain what needs clarification.",
+        "Use category and storage location as separate fields.",
+        'Explicitly spoken storage locations override inference, for example “bread in the freezer” means Bread, Freezer.',
+        "When the location is inferred and uncertain, return it as a suggestion and request confirmation in clarificationNeeded.",
+        "Do not claim that a storage suggestion guarantees food safety.",
+        `Transcript: ${parsed.data.transcript.trim()}`,
+      ].join("\n"),
+      config: {
+        responseMimeType: "application/json",
+        responseJsonSchema: voiceSchema,
+        maxOutputTokens: 2500,
+      },
+    }));
+    const analysis = InterpretVoiceIngredientsResponse.parse(JSON.parse(getJsonText(result)));
+    res.json(analysis);
   } catch (error) {
     sendGeminiError(req, res, error);
   }

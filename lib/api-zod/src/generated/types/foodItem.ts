@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { FoodItemCategory } from './foodItemCategory';
 import type { FoodItemLocation } from './foodItemLocation';
 
 export interface FoodItem {
@@ -22,4 +23,6 @@ export interface FoodItem {
   location: FoodItemLocation;
   /** @nullable */
   expirationDate: Date | null;
+  /** @nullable */
+  category?: FoodItemCategory;
 }

@@ -18,6 +18,27 @@ export const FoodItemLocation = {
   Freezer: 'Freezer',
 } as const;
 
+/**
+ * @nullable
+ */
+export type FoodItemCategory = typeof FoodItemCategory[keyof typeof FoodItemCategory] | null;
+
+
+export const FoodItemCategory = {
+  Fruit: 'Fruit',
+  Vegetable: 'Vegetable',
+  Dairy: 'Dairy',
+  Meat: 'Meat',
+  Seafood: 'Seafood',
+  Grains: 'Grains',
+  Bakery: 'Bakery',
+  Frozen: 'Frozen',
+  Condiment: 'Condiment',
+  Beverage: 'Beverage',
+  Snack: 'Snack',
+  Other: 'Other',
+} as const;
+
 export interface FoodItem {
   /** @minLength 1 */
   id: string;
@@ -33,6 +54,8 @@ export interface FoodItem {
   location: FoodItemLocation;
   /** @nullable */
   expirationDate: string | null;
+  /** @nullable */
+  category?: FoodItemCategory;
 }
 
 export interface ShoppingItem {
@@ -376,5 +399,67 @@ export interface KitchenImageAnalysis {
   items: ScanCandidate[];
   /** @maxLength 1000 */
   notes: string;
+}
+
+export interface VoiceIngredientInput {
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  transcript: string;
+}
+
+export type VoiceIngredientSuggestionCategory = typeof VoiceIngredientSuggestionCategory[keyof typeof VoiceIngredientSuggestionCategory];
+
+
+export const VoiceIngredientSuggestionCategory = {
+  Fruit: 'Fruit',
+  Vegetable: 'Vegetable',
+  Dairy: 'Dairy',
+  Meat: 'Meat',
+  Seafood: 'Seafood',
+  Grains: 'Grains',
+  Bakery: 'Bakery',
+  Frozen: 'Frozen',
+  Condiment: 'Condiment',
+  Beverage: 'Beverage',
+  Snack: 'Snack',
+  Other: 'Other',
+} as const;
+
+export type VoiceIngredientSuggestionLocation = typeof VoiceIngredientSuggestionLocation[keyof typeof VoiceIngredientSuggestionLocation];
+
+
+export const VoiceIngredientSuggestionLocation = {
+  Pantry: 'Pantry',
+  Fridge: 'Fridge',
+  Freezer: 'Freezer',
+} as const;
+
+export interface VoiceIngredientSuggestion {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  quantity: number | null;
+  /**
+     * @maxLength 40
+     * @nullable
+     */
+  unit: string | null;
+  category: VoiceIngredientSuggestionCategory;
+  location: VoiceIngredientSuggestionLocation;
+  /** @maxLength 300 */
+  clarificationNeeded: string;
+}
+
+export interface VoiceIngredientAnalysis {
+  /** @maxItems 40 */
+  items: VoiceIngredientSuggestion[];
 }
 

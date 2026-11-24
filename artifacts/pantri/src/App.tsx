@@ -64,7 +64,7 @@ function fromApiData(data: AccountData): AppData {
       budgetCurrency: data.preferences.budgetCurrency ?? 'USD',
       budgetPeriod: data.preferences.budgetPeriod ?? 'Weekly',
     },
-    inventory: data.inventory.map((item) => ({ ...item, expirationDate: item.expirationDate ?? '' })),
+    inventory: data.inventory.map((item) => ({ ...item, expirationDate: item.expirationDate ?? '', category: item.category ?? null })),
   };
 }
 
@@ -226,6 +226,17 @@ function PantriApp() {
     setEditingFood(undefined);
     notify(editingFood ? 'Your kitchen is updated.' : 'Added to your kitchen.');
   };
+  const saveFoods = (foods: Omit<FoodItem, 'id'>[]) => {
+    if (!foods.length) return;
+    const inventory = [
+      ...foods.map((food) => ({ ...food, id: createId() })),
+      ...data.inventory,
+    ];
+    updateData({ ...data, inventory });
+    setShowFoodDialog(false);
+    setEditingFood(undefined);
+    notify(`${foods.length} ${foods.length === 1 ? 'item' : 'items'} added to your kitchen.`);
+  };
   const openAdd = () => { setEditingFood(undefined); setShowFoodDialog(true); };
   const openEdit = (item: FoodItem) => { setEditingFood(item); setShowFoodDialog(true); };
   const deleteFood = (id: string) => {
@@ -332,7 +343,7 @@ function PantriApp() {
           </div>
           <div className="import-actions"><button className="button button-primary" onClick={() => void importLegacy()} disabled={importBusy} data-testid="button-import-legacy">{importBusy ? 'Importing…' : 'Review and import'}</button><button className="button button-outline" onClick={() => { localStorage.setItem(`pantri-import-dismissed:${accountId}`, '1'); setShowImportPrompt(false); }} disabled={importBusy} data-testid="button-skip-import">Not now</button></div>
         </div>}
-        {showFoodDialog && <FoodItemDialog item={editingFood} onClose={() => { setShowFoodDialog(false); setEditingFood(undefined); }} onSave={saveFood} />}
+        {showFoodDialog && <FoodItemDialog item={editingFood} onClose={() => { setShowFoodDialog(false); setEditingFood(undefined); }} onSave={saveFood} onSaveMany={saveFoods} />}
         {toast && <div className="toast-note" role="status" data-testid="status-toast">{toast}</div>}
       </div>
   );

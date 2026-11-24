@@ -1,6 +1,7 @@
 import type { MealPlanItem, SavedRecipe } from '@workspace/api-client-react';
 
 export type Location = 'Pantry' | 'Fridge' | 'Freezer';
+export type FoodCategory = 'Fruit' | 'Vegetable' | 'Dairy' | 'Meat' | 'Seafood' | 'Grains' | 'Bakery' | 'Frozen' | 'Condiment' | 'Beverage' | 'Snack' | 'Other';
 
 export type FoodItem = {
   id: string;
@@ -9,6 +10,7 @@ export type FoodItem = {
   unit: string;
   location: Location;
   expirationDate: string;
+  category?: FoodCategory | null;
 };
 
 export type Recipe = {

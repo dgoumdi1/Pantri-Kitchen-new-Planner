@@ -74,7 +74,7 @@ export function FoodItemDialog({ item, onClose, onSave, onSaveMany }: Props) {
     setSuggestions([]);
     setConfirmed(false);
     const recognition = new Constructor();
-    recognition.continuous = true;
+    recognition.continuous = false;
     recognition.interimResults = true;
     recognition.lang = navigator.language || 'en-US';
     recognition.onresult = (event) => {
@@ -91,7 +91,7 @@ export function FoodItemDialog({ item, onClose, onSave, onSaveMany }: Props) {
         'service-not-allowed': 'Speech recognition is unavailable in this browser session. Enter items manually.',
         'no-speech': 'No speech was detected. Try again or use manual entry.',
         'audio-capture': 'A microphone could not be found or accessed. Check your microphone and try again.',
-        'network': 'The recognition service could not be reached. Try again or use manual entry.',
+        'network': 'The browser speech-recognition provider could not be reached. It may be unavailable in this environment or network. Try again or use manual entry.',
         'aborted': 'Listening was stopped.',
       };
       setVoiceError(messages[event.error] ?? 'Speech recognition failed. Enter the items manually.');
@@ -171,6 +171,7 @@ export function FoodItemDialog({ item, onClose, onSave, onSaveMany }: Props) {
               </button>
               {voiceStatus === 'listening' && <button type="button" className="button button-outline" onClick={() => { stopRecognition(true); setTranscript(''); transcriptRef.current = ''; setSuggestions([]); setVoiceError('Voice input canceled. No items were added.'); }} data-testid="button-cancel-voice">Cancel</button>}
               {voiceStatus === 'listening' && <span className="form-error" role="status">Listening…</span>}
+              {voiceStatus === 'stopped' && !transcript.trim() && <span className="field-hint" role="status">Stopped listening. If no transcript appears, the browser recognition provider may be unavailable.</span>}
             </div>
             {!voiceSupported && <p className="form-error" role="alert">Speech recognition is not supported in this browser. You can enter ingredients manually below.</p>}
             {voiceSupported && <p className="field-hint" style={{ marginTop: 10 }}>

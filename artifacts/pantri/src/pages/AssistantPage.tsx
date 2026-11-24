@@ -46,7 +46,8 @@ export function AssistantPage({ data, onApplyAction, onSaveRecipe, onManualEntry
   const generateRecipe = useGenerateAssistantRecipe();
   const analyzeImage = useAnalyzeKitchenImage();
   const fileInput = useRef<HTMLInputElement>(null);
-  const [consented, setConsented] = useState(false);
+  const consentStorageKey = `pantri-google-ai-consent:${userId}`;
+  const [consented, setConsented] = useState(() => sessionStorage.getItem(consentStorageKey) === 'accepted');
   const [message, setMessage] = useState('');
   const [localMessages, setLocalMessages] = useState<LocalMessage[]>([]);
   const [pendingActions, setPendingActions] = useState<AssistantAction[]>([]);
@@ -58,6 +59,7 @@ export function AssistantPage({ data, onApplyAction, onSaveRecipe, onManualEntry
   const [scanNotes, setScanNotes] = useState('');
   const [scanError, setScanError] = useState('');
   const [scanBusy, setScanBusy] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [recipePrompt, setRecipePrompt] = useState('');
   const [servings, setServings] = useState('2');
   const [timeLimit, setTimeLimit] = useState('30');
@@ -128,27 +130,9 @@ export function AssistantPage({ data, onApplyAction, onSaveRecipe, onManualEntry
     });
   };
 
-  const onImageSelected = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0];
-    event.currentTarget.value = '';
-    if (!file) return;
-    setScanError('');
-    setScanDrafts([]);
-    setScanReviewed(false);
-    setScanNotes('');
-    if (file.size > 5 * 1024 * 1024) {
-      setScanError('That image is larger than 5 MB. Choose a smaller photo or receipt.');
-      return;
-    }
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setScanError('Choose a JPEG, PNG, or WebP image.');
-      return;
-    }
-    if (!consented) {
-      setScanError('Please review and accept the data-use notice before sending an image to Google.');
-      return;
-    }
+  const analyzeSelectedFile = async (file: File) => {
     setScanBusy(true);
+    setScanError('');
     try {
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -156,6 +140,7 @@ export function AssistantPage({ data, onApplyAction, onSaveRecipe, onManualEntry
         reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
         reader.readAsDataURL(file);
       });
+      if (!base64) throw new Error('The selected image could not be read.');
       analyzeImage.mutate({ data: { imageBase64: base64, mimeType: file.type as 'image/jpeg' | 'image/png' | 'image/webp', mode: scanMode } }, {
         onSuccess: (analysis) => {
           setScanNotes(analysis.notes || '');
@@ -164,6 +149,7 @@ export function AssistantPage({ data, onApplyAction, onSaveRecipe, onManualEntry
             const duplicate = inventoryNames.has(normalizeName(item.name));
             return { ...item, selected: !duplicate, duplicate };
           }));
+          setSelectedFile(null);
           setScanBusy(false);
         },
         onError: (error) => {
@@ -175,6 +161,32 @@ export function AssistantPage({ data, onApplyAction, onSaveRecipe, onManualEntry
       setScanError(getErrorMessage(error));
       setScanBusy(false);
     }
+  };
+
+  const onImageSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file) return;
+    setScanError('');
+    setScanDrafts([]);
+    setScanReviewed(false);
+    setScanNotes('');
+    if (file.size > 5 * 1024 * 1024) {
+      setSelectedFile(null);
+      setScanError('That image is larger than 5 MB. Choose a smaller photo or receipt.');
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setSelectedFile(null);
+      setScanError('This format is not supported. Choose a JPEG, PNG, or WebP image.');
+      return;
+    }
+    setSelectedFile(file);
+    if (!consented) {
+      setScanError('Image selected on this device only. Review the data-use notice above, then analyze it.');
+      return;
+    }
+    void analyzeSelectedFile(file);
   };
 
   const updateScanDraft = (index: number, field: keyof ScanDraft, value: string | number | boolean) => {
@@ -332,7 +344,12 @@ export function AssistantPage({ data, onApplyAction, onSaveRecipe, onManualEntry
       </header>
 
       <label className="pa-consent" htmlFor="assistant-data-consent" data-testid="label-assistant-consent">
-        <input id="assistant-data-consent" type="checkbox" checked={consented} onChange={(event) => setConsented(event.target.checked)} data-testid="checkbox-assistant-consent" />
+        <input id="assistant-data-consent" type="checkbox" checked={consented} onChange={(event) => {
+          const accepted = event.target.checked;
+          setConsented(accepted);
+          if (accepted) sessionStorage.setItem(consentStorageKey, 'accepted');
+          else sessionStorage.removeItem(consentStorageKey);
+        }} data-testid="checkbox-assistant-consent" />
         <span><strong>Before you ask Pantri’s assistant:</strong> {consentCopy} Uploaded images are not retained by Pantri. You can use manual entry instead at any time.</span>
       </label>
 
@@ -390,9 +407,11 @@ export function AssistantPage({ data, onApplyAction, onSaveRecipe, onManualEntry
                   <button type="button" className={`pa-mode ${scanMode === 'food_photo' ? 'active' : ''}`} aria-pressed={scanMode === 'food_photo'} onClick={() => { setScanMode('food_photo'); setScanDrafts([]); setScanReviewed(false); }} data-testid="button-scan-mode-food-photo"><ImagePlus size={14} /> Food photo</button>
                 </div>
                 <p className="pa-upload-info">{scanMode === 'receipt' ? 'We’ll look for grocery items to add to your shopping list.' : 'We’ll identify food for your kitchen inventory.'} Images are sent to Google for analysis and are not retained by Pantri. Maximum file size: 5 MB.</p>
-                <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" onChange={onImageSelected} hidden data-testid="input-kitchen-image" />
-                <button type="button" className="pa-button secondary" onClick={() => fileInput.current?.click()} disabled={scanBusy || analyzeImage.isPending || !consented} data-testid="button-upload-kitchen-image">{scanBusy || analyzeImage.isPending ? <LoaderCircle size={14} /> : <ImagePlus size={14} />}{scanBusy || analyzeImage.isPending ? 'Reviewing image…' : 'Choose an image'}</button>
+                 <input ref={fileInput} type="file" accept="image/*" onChange={onImageSelected} hidden data-testid="input-kitchen-image" />
+                 <button type="button" className="pa-button secondary" onClick={() => fileInput.current?.click()} disabled={scanBusy || analyzeImage.isPending} data-testid="button-upload-kitchen-image">{scanBusy || analyzeImage.isPending ? <LoaderCircle size={14} /> : <ImagePlus size={14} />}{scanBusy || analyzeImage.isPending ? 'Reviewing image…' : 'Choose an image'}</button>
                 <button type="button" className="pa-button outline" style={{ marginLeft: 8 }} onClick={onManualEntry} data-testid="button-manual-inventory-entry"><Plus size={14} /> Enter manually</button>
+                 {!consented && <p className="pa-field-hint" style={{ margin: '10px 0 0' }}>You can choose a file now; it stays on this device until you accept the data-use notice and analyze it.</p>}
+                 {selectedFile && consented && !scanBusy && !scanDrafts.length && <button type="button" className="pa-button" style={{ marginTop: 10 }} onClick={() => void analyzeSelectedFile(selectedFile)} data-testid="button-analyze-selected-image"><Sparkles size={14} />{scanError ? 'Try analysis again' : 'Analyze selected image'}</button>}
               </div>
               {analyzeImage.isError && <div className="pa-error" role="alert" data-testid="error-analyze-image"><AlertCircle size={14} />{getErrorMessage(analyzeImage.error)}</div>}
               {scanError && <div className="pa-error" role="alert" data-testid="error-scan-review"><AlertCircle size={14} />{scanError}</div>}

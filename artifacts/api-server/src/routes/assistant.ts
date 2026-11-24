@@ -364,7 +364,6 @@ router.post("/assistant/scan", sharedFreeTierLimit, scanLimit, async (req, res):
     properties: {
       items: {
         type: "array",
-        maxItems: 60,
         items: {
           type: "object",
           properties: {

@@ -38,7 +38,11 @@ export const getMyDataResponseShoppingItemSourceRecipeMax = 120;
 
 export const getMyDataResponsePreferencesDietaryFiltersItemMax = 40;
 
+export const getMyDataResponsePreferencesAllergyFiltersItemMax = 40;
+
 export const getMyDataResponsePreferencesHouseholdSizeMax = 20;
+
+export const getMyDataResponsePreferencesBudgetAmountMin = 0;
 
 
 export const getMyDataResponseSavedRecipesItemTitleMax = 160;
@@ -66,6 +70,8 @@ export const getMyDataResponseSavedRecipesItemFiberGramsPerServingMin = 0;
 
 export const getMyDataResponseMealPlanItemTitleMax = 160;
 
+export const getMyDataResponseMealPlanItemServingsMax = 30;
+
 
 
 export const GetMyDataResponse = zod.object({
@@ -87,9 +93,14 @@ export const GetMyDataResponse = zod.object({
 })),
   "preferences": zod.object({
   "dietaryFilters": zod.array(zod.string().max(getMyDataResponsePreferencesDietaryFiltersItemMax)),
+  "allergyFilters": zod.array(zod.string().max(getMyDataResponsePreferencesAllergyFiltersItemMax)).optional(),
+  "cuisinePreferences": zod.array(zod.enum(['Worldwide', 'Moroccan', 'Italian', 'Mexican', 'Indian', 'Chinese', 'Japanese', 'Mediterranean', 'American', 'Other'])).optional(),
   "householdSize": zod.number().int().min(1).max(getMyDataResponsePreferencesHouseholdSizeMax),
   "units": zod.enum(['Metric', 'Imperial']),
-  "expirationReminders": zod.boolean()
+  "expirationReminders": zod.boolean(),
+  "budgetAmount": zod.number().min(getMyDataResponsePreferencesBudgetAmountMin).nullish(),
+  "budgetCurrency": zod.enum(['USD', 'EUR', 'GBP', 'MAD', 'CAD']).optional(),
+  "budgetPeriod": zod.enum(['Weekly', 'Monthly']).optional()
 }),
   "savedRecipes": zod.array(zod.object({
   "id": zod.string().min(1),
@@ -112,7 +123,8 @@ export const GetMyDataResponse = zod.object({
   "date": zod.coerce.date(),
   "meal": zod.enum(['Breakfast', 'Lunch', 'Dinner', 'Snack']),
   "title": zod.string().min(1).max(getMyDataResponseMealPlanItemTitleMax),
-  "recipeId": zod.string().nullish()
+  "recipeId": zod.string().nullish(),
+  "servings": zod.number().int().min(1).max(getMyDataResponseMealPlanItemServingsMax).nullish()
 }))
 })
 
@@ -138,7 +150,11 @@ export const saveMyDataBodyShoppingItemSourceRecipeMax = 120;
 
 export const saveMyDataBodyPreferencesDietaryFiltersItemMax = 40;
 
+export const saveMyDataBodyPreferencesAllergyFiltersItemMax = 40;
+
 export const saveMyDataBodyPreferencesHouseholdSizeMax = 20;
+
+export const saveMyDataBodyPreferencesBudgetAmountMin = 0;
 
 
 export const saveMyDataBodySavedRecipesItemTitleMax = 160;
@@ -166,6 +182,8 @@ export const saveMyDataBodySavedRecipesItemFiberGramsPerServingMin = 0;
 
 export const saveMyDataBodyMealPlanItemTitleMax = 160;
 
+export const saveMyDataBodyMealPlanItemServingsMax = 30;
+
 
 
 export const SaveMyDataBody = zod.object({
@@ -187,9 +205,14 @@ export const SaveMyDataBody = zod.object({
 })),
   "preferences": zod.object({
   "dietaryFilters": zod.array(zod.string().max(saveMyDataBodyPreferencesDietaryFiltersItemMax)),
+  "allergyFilters": zod.array(zod.string().max(saveMyDataBodyPreferencesAllergyFiltersItemMax)).optional(),
+  "cuisinePreferences": zod.array(zod.enum(['Worldwide', 'Moroccan', 'Italian', 'Mexican', 'Indian', 'Chinese', 'Japanese', 'Mediterranean', 'American', 'Other'])).optional(),
   "householdSize": zod.number().int().min(1).max(saveMyDataBodyPreferencesHouseholdSizeMax),
   "units": zod.enum(['Metric', 'Imperial']),
-  "expirationReminders": zod.boolean()
+  "expirationReminders": zod.boolean(),
+  "budgetAmount": zod.number().min(saveMyDataBodyPreferencesBudgetAmountMin).nullish(),
+  "budgetCurrency": zod.enum(['USD', 'EUR', 'GBP', 'MAD', 'CAD']).optional(),
+  "budgetPeriod": zod.enum(['Weekly', 'Monthly']).optional()
 }),
   "savedRecipes": zod.array(zod.object({
   "id": zod.string().min(1),
@@ -212,7 +235,8 @@ export const SaveMyDataBody = zod.object({
   "date": zod.coerce.date(),
   "meal": zod.enum(['Breakfast', 'Lunch', 'Dinner', 'Snack']),
   "title": zod.string().min(1).max(saveMyDataBodyMealPlanItemTitleMax),
-  "recipeId": zod.string().nullish()
+  "recipeId": zod.string().nullish(),
+  "servings": zod.number().int().min(1).max(saveMyDataBodyMealPlanItemServingsMax).nullish()
 }))
 })
 
@@ -234,7 +258,11 @@ export const saveMyDataResponseShoppingItemSourceRecipeMax = 120;
 
 export const saveMyDataResponsePreferencesDietaryFiltersItemMax = 40;
 
+export const saveMyDataResponsePreferencesAllergyFiltersItemMax = 40;
+
 export const saveMyDataResponsePreferencesHouseholdSizeMax = 20;
+
+export const saveMyDataResponsePreferencesBudgetAmountMin = 0;
 
 
 export const saveMyDataResponseSavedRecipesItemTitleMax = 160;
@@ -262,6 +290,8 @@ export const saveMyDataResponseSavedRecipesItemFiberGramsPerServingMin = 0;
 
 export const saveMyDataResponseMealPlanItemTitleMax = 160;
 
+export const saveMyDataResponseMealPlanItemServingsMax = 30;
+
 
 
 export const SaveMyDataResponse = zod.object({
@@ -283,9 +313,14 @@ export const SaveMyDataResponse = zod.object({
 })),
   "preferences": zod.object({
   "dietaryFilters": zod.array(zod.string().max(saveMyDataResponsePreferencesDietaryFiltersItemMax)),
+  "allergyFilters": zod.array(zod.string().max(saveMyDataResponsePreferencesAllergyFiltersItemMax)).optional(),
+  "cuisinePreferences": zod.array(zod.enum(['Worldwide', 'Moroccan', 'Italian', 'Mexican', 'Indian', 'Chinese', 'Japanese', 'Mediterranean', 'American', 'Other'])).optional(),
   "householdSize": zod.number().int().min(1).max(saveMyDataResponsePreferencesHouseholdSizeMax),
   "units": zod.enum(['Metric', 'Imperial']),
-  "expirationReminders": zod.boolean()
+  "expirationReminders": zod.boolean(),
+  "budgetAmount": zod.number().min(saveMyDataResponsePreferencesBudgetAmountMin).nullish(),
+  "budgetCurrency": zod.enum(['USD', 'EUR', 'GBP', 'MAD', 'CAD']).optional(),
+  "budgetPeriod": zod.enum(['Weekly', 'Monthly']).optional()
 }),
   "savedRecipes": zod.array(zod.object({
   "id": zod.string().min(1),
@@ -308,7 +343,8 @@ export const SaveMyDataResponse = zod.object({
   "date": zod.coerce.date(),
   "meal": zod.enum(['Breakfast', 'Lunch', 'Dinner', 'Snack']),
   "title": zod.string().min(1).max(saveMyDataResponseMealPlanItemTitleMax),
-  "recipeId": zod.string().nullish()
+  "recipeId": zod.string().nullish(),
+  "servings": zod.number().int().min(1).max(saveMyDataResponseMealPlanItemServingsMax).nullish()
 }))
 })
 
@@ -337,7 +373,11 @@ export const importMyDataBodyDataShoppingItemSourceRecipeMax = 120;
 
 export const importMyDataBodyDataPreferencesDietaryFiltersItemMax = 40;
 
+export const importMyDataBodyDataPreferencesAllergyFiltersItemMax = 40;
+
 export const importMyDataBodyDataPreferencesHouseholdSizeMax = 20;
+
+export const importMyDataBodyDataPreferencesBudgetAmountMin = 0;
 
 
 export const importMyDataBodyDataSavedRecipesItemTitleMax = 160;
@@ -365,6 +405,8 @@ export const importMyDataBodyDataSavedRecipesItemFiberGramsPerServingMin = 0;
 
 export const importMyDataBodyDataMealPlanItemTitleMax = 160;
 
+export const importMyDataBodyDataMealPlanItemServingsMax = 30;
+
 
 
 export const ImportMyDataBody = zod.object({
@@ -388,9 +430,14 @@ export const ImportMyDataBody = zod.object({
 })),
   "preferences": zod.object({
   "dietaryFilters": zod.array(zod.string().max(importMyDataBodyDataPreferencesDietaryFiltersItemMax)),
+  "allergyFilters": zod.array(zod.string().max(importMyDataBodyDataPreferencesAllergyFiltersItemMax)).optional(),
+  "cuisinePreferences": zod.array(zod.enum(['Worldwide', 'Moroccan', 'Italian', 'Mexican', 'Indian', 'Chinese', 'Japanese', 'Mediterranean', 'American', 'Other'])).optional(),
   "householdSize": zod.number().int().min(1).max(importMyDataBodyDataPreferencesHouseholdSizeMax),
   "units": zod.enum(['Metric', 'Imperial']),
-  "expirationReminders": zod.boolean()
+  "expirationReminders": zod.boolean(),
+  "budgetAmount": zod.number().min(importMyDataBodyDataPreferencesBudgetAmountMin).nullish(),
+  "budgetCurrency": zod.enum(['USD', 'EUR', 'GBP', 'MAD', 'CAD']).optional(),
+  "budgetPeriod": zod.enum(['Weekly', 'Monthly']).optional()
 }),
   "savedRecipes": zod.array(zod.object({
   "id": zod.string().min(1),
@@ -413,7 +460,8 @@ export const ImportMyDataBody = zod.object({
   "date": zod.coerce.date(),
   "meal": zod.enum(['Breakfast', 'Lunch', 'Dinner', 'Snack']),
   "title": zod.string().min(1).max(importMyDataBodyDataMealPlanItemTitleMax),
-  "recipeId": zod.string().nullish()
+  "recipeId": zod.string().nullish(),
+  "servings": zod.number().int().min(1).max(importMyDataBodyDataMealPlanItemServingsMax).nullish()
 }))
 })
 })
@@ -436,7 +484,11 @@ export const importMyDataResponseShoppingItemSourceRecipeMax = 120;
 
 export const importMyDataResponsePreferencesDietaryFiltersItemMax = 40;
 
+export const importMyDataResponsePreferencesAllergyFiltersItemMax = 40;
+
 export const importMyDataResponsePreferencesHouseholdSizeMax = 20;
+
+export const importMyDataResponsePreferencesBudgetAmountMin = 0;
 
 
 export const importMyDataResponseSavedRecipesItemTitleMax = 160;
@@ -464,6 +516,8 @@ export const importMyDataResponseSavedRecipesItemFiberGramsPerServingMin = 0;
 
 export const importMyDataResponseMealPlanItemTitleMax = 160;
 
+export const importMyDataResponseMealPlanItemServingsMax = 30;
+
 
 
 export const ImportMyDataResponse = zod.object({
@@ -485,9 +539,14 @@ export const ImportMyDataResponse = zod.object({
 })),
   "preferences": zod.object({
   "dietaryFilters": zod.array(zod.string().max(importMyDataResponsePreferencesDietaryFiltersItemMax)),
+  "allergyFilters": zod.array(zod.string().max(importMyDataResponsePreferencesAllergyFiltersItemMax)).optional(),
+  "cuisinePreferences": zod.array(zod.enum(['Worldwide', 'Moroccan', 'Italian', 'Mexican', 'Indian', 'Chinese', 'Japanese', 'Mediterranean', 'American', 'Other'])).optional(),
   "householdSize": zod.number().int().min(1).max(importMyDataResponsePreferencesHouseholdSizeMax),
   "units": zod.enum(['Metric', 'Imperial']),
-  "expirationReminders": zod.boolean()
+  "expirationReminders": zod.boolean(),
+  "budgetAmount": zod.number().min(importMyDataResponsePreferencesBudgetAmountMin).nullish(),
+  "budgetCurrency": zod.enum(['USD', 'EUR', 'GBP', 'MAD', 'CAD']).optional(),
+  "budgetPeriod": zod.enum(['Weekly', 'Monthly']).optional()
 }),
   "savedRecipes": zod.array(zod.object({
   "id": zod.string().min(1),
@@ -510,7 +569,8 @@ export const ImportMyDataResponse = zod.object({
   "date": zod.coerce.date(),
   "meal": zod.enum(['Breakfast', 'Lunch', 'Dinner', 'Snack']),
   "title": zod.string().min(1).max(importMyDataResponseMealPlanItemTitleMax),
-  "recipeId": zod.string().nullish()
+  "recipeId": zod.string().nullish(),
+  "servings": zod.number().int().min(1).max(importMyDataResponseMealPlanItemServingsMax).nullish()
 }))
 })
 

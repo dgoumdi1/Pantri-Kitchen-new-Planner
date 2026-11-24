@@ -21,9 +21,14 @@ const emptyData = (): AccountData => ({
   shopping: [],
   preferences: {
     dietaryFilters: [],
+    allergyFilters: [],
+    cuisinePreferences: ["Worldwide"],
     householdSize: 2,
     units: "Metric",
     expirationReminders: true,
+    budgetAmount: null,
+    budgetCurrency: "USD",
+    budgetPeriod: "Weekly",
   },
   savedRecipes: [],
   mealPlan: [],
@@ -31,6 +36,25 @@ const emptyData = (): AccountData => ({
 
 function normalize(value: string): string {
   return value.trim().toLocaleLowerCase().replace(/\s+/g, " ");
+}
+
+function normalizePreferences(preferences: AccountData["preferences"] | undefined): AccountData["preferences"] {
+  const cuisinePreferences = Array.isArray(preferences?.cuisinePreferences)
+    ? preferences.cuisinePreferences
+    : [];
+  return {
+    dietaryFilters: preferences?.dietaryFilters ?? [],
+    allergyFilters: preferences?.allergyFilters ?? [],
+    cuisinePreferences: cuisinePreferences.includes("Worldwide") || cuisinePreferences.length === 0
+      ? ["Worldwide"]
+      : cuisinePreferences,
+    householdSize: preferences?.householdSize ?? 2,
+    units: preferences?.units ?? "Metric",
+    expirationReminders: preferences?.expirationReminders ?? true,
+    budgetAmount: preferences?.budgetAmount ?? null,
+    budgetCurrency: preferences?.budgetCurrency ?? "USD",
+    budgetPeriod: preferences?.budgetPeriod ?? "Weekly",
+  };
 }
 
 function mergeImport(current: AccountData, incoming: AccountData): AccountData {
@@ -104,7 +128,12 @@ async function readOrCreateData(userId: string): Promise<AccountData> {
     .from(pantriAccountDataTable)
     .where(eq(pantriAccountDataTable.userId, userId))
     .limit(1);
-  return (row?.data as AccountData | undefined) ?? emptyData();
+  const stored = row?.data as AccountData | undefined;
+  if (!stored) return emptyData();
+  return {
+    ...stored,
+    preferences: normalizePreferences(stored.preferences),
+  };
 }
 
 router.get("/me/data", async (req, res): Promise<void> => {
@@ -132,6 +161,7 @@ router.put("/me/data", async (req, res): Promise<void> => {
   }
 
   const data = JSON.parse(JSON.stringify(parsed.data)) as AccountData;
+  data.preferences = normalizePreferences(data.preferences);
   await db
     .insert(pantriAccountDataTable)
     .values({ userId, data, updatedAt: new Date() })

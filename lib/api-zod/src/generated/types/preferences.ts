@@ -5,11 +5,17 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { PreferencesBudgetCurrency } from './preferencesBudgetCurrency';
+import type { PreferencesBudgetPeriod } from './preferencesBudgetPeriod';
+import type { PreferencesCuisinePreferencesItem } from './preferencesCuisinePreferencesItem';
 import type { PreferencesUnits } from './preferencesUnits';
 
 export interface Preferences {
   /** @items.maxLength 40 */
   dietaryFilters: string[];
+  /** @items.maxLength 40 */
+  allergyFilters?: string[];
+  cuisinePreferences?: PreferencesCuisinePreferencesItem[];
   /**
      * @minimum 1
      * @maximum 20
@@ -17,4 +23,11 @@ export interface Preferences {
   householdSize: number;
   units: PreferencesUnits;
   expirationReminders: boolean;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  budgetAmount?: number | null;
+  budgetCurrency?: PreferencesBudgetCurrency;
+  budgetPeriod?: PreferencesBudgetPeriod;
 }

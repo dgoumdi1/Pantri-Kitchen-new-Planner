@@ -29,7 +29,17 @@ export const seedData: AppData = {
     { id: 'seed-shopping-2', name: 'Cucumber', quantity: 2, unit: 'pieces', checked: false, sourceRecipe: 'Crispy chickpea bowls' },
     { id: 'seed-shopping-3', name: 'Fresh basil', quantity: 1, unit: 'bunch', checked: true },
   ],
-  preferences: { dietaryFilters: [], householdSize: 2, units: 'Metric', expirationReminders: true },
+  preferences: {
+    dietaryFilters: [],
+    allergyFilters: [],
+    cuisinePreferences: ['Worldwide'],
+    householdSize: 2,
+    units: 'Metric',
+    expirationReminders: true,
+    budgetAmount: null,
+    budgetCurrency: 'USD',
+    budgetPeriod: 'Weekly',
+  },
   savedRecipes: [],
   mealPlan: [],
 };

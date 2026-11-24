@@ -1,10 +1,11 @@
 import { Link, useLocation } from 'wouter';
-import { House, CookingPot, ShoppingBasket, Settings, Leaf, Sparkles, LogOut } from 'lucide-react';
+import { House, CookingPot, CalendarDays, ShoppingBasket, Settings, Leaf, Sparkles, LogOut } from 'lucide-react';
 import { useClerk, useUser } from '@clerk/react';
 
 const links = [
   { href: '/', label: 'Dashboard', icon: House },
   { href: '/recipes', label: 'Recipes', icon: CookingPot },
+  { href: '/planner', label: 'Meal Prep', icon: CalendarDays },
   { href: '/assistant', label: 'Assistant', icon: Sparkles },
   { href: '/shopping', label: 'Shopping List', icon: ShoppingBasket },
   { href: '/settings', label: 'Settings', icon: Settings },

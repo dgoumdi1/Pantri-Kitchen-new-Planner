@@ -251,9 +251,26 @@ components:
         dietaryFilters:
           type: array
           items: { type: string, maxLength: 40 }
+        allergyFilters:
+          type: array
+          items: { type: string, maxLength: 40 }
+        cuisinePreferences:
+          type: array
+          items:
+            type: string
+            enum: [Worldwide, Moroccan, Italian, Mexican, Indian, Chinese, Japanese, Mediterranean, American, Other]
         householdSize: { type: integer, minimum: 1, maximum: 20 }
         units: { type: string, enum: [Metric, Imperial] }
         expirationReminders: { type: boolean }
+        budgetAmount:
+          type: ["number", "null"]
+          minimum: 0
+        budgetCurrency:
+          type: string
+          enum: [USD, EUR, GBP, MAD, CAD]
+        budgetPeriod:
+          type: string
+          enum: [Weekly, Monthly]
     RecipeIngredient:
       type: object
       required: [name, quantity, unit]
@@ -290,6 +307,10 @@ components:
         meal: { type: string, enum: [Breakfast, Lunch, Dinner, Snack] }
         title: { type: string, minLength: 1, maxLength: 160 }
         recipeId: { type: ["string", "null"] }
+        servings:
+          type: ["integer", "null"]
+          minimum: 1
+          maximum: 30
     AccountData:
       type: object
       required: [inventory, shopping, preferences, savedRecipes, mealPlan]
@@ -402,4 +423,3 @@ components:
           maxItems: 60
           items: { $ref: "#/components/schemas/ScanCandidate" }
         notes: { type: string, maxLength: 1000 }
-

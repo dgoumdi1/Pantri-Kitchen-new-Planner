@@ -114,3 +114,41 @@ export function getJsonText(response: { text?: string | null }): string {
   }
   return response.text;
 }
+
+export async function generateWithTransientRetry<T>(
+  operation: () => Promise<T>,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      const details = getGeminiErrorDetails(error);
+      const text = `${details.code} ${details.message}`.toLowerCase();
+      const authenticationFailure =
+        details.status === 401 ||
+        details.status === 403 ||
+        text.includes("api key") ||
+        text.includes("unauthenticated") ||
+        text.includes("permission_denied");
+      const schemaOrValidationFailure =
+        text.includes("invalid_argument") ||
+        text.includes("invalid input") ||
+        text.includes("validation");
+      const transient =
+        !authenticationFailure &&
+        !schemaOrValidationFailure &&
+        (details.status === 503 ||
+          details.status === 502 ||
+          details.status === 504 ||
+          text.includes("overload") ||
+          text.includes("unavailable") ||
+          text.includes("temporarily"));
+      if (!transient || attempt === 2) break;
+      const jitter = Math.floor(Math.random() * 250);
+      await new Promise((resolve) => setTimeout(resolve, (attempt + 1) * 500 + jitter));
+    }
+  }
+  throw lastError;
+}

@@ -19,4 +19,10 @@ export interface MealPlanItem {
   title: string;
   /** @nullable */
   recipeId?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 30
+     * @nullable
+     */
+  servings?: number | null;
 }

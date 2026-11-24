@@ -65,6 +65,7 @@ export function AssistantPage({ data, onApplyAction, onSaveRecipe, onManualEntry
   const [timeLimit, setTimeLimit] = useState('30');
   const [recipe, setRecipe] = useState<GeneratedRecipe | null>(null);
   const [recipeSaveState, setRecipeSaveState] = useState<'idle' | 'saved' | 'error'>('idle');
+  const [recipeSaveBusy, setRecipeSaveBusy] = useState(false);
   const [recipeSaveError, setRecipeSaveError] = useState('');
   const [toast, setToast] = useState('');
 
@@ -182,11 +183,7 @@ export function AssistantPage({ data, onApplyAction, onSaveRecipe, onManualEntry
       return;
     }
     setSelectedFile(file);
-    if (!consented) {
-      setScanError('Image selected on this device only. Review the data-use notice above, then analyze it.');
-      return;
-    }
-    void analyzeSelectedFile(file);
+    setScanError('');
   };
 
   const updateScanDraft = (index: number, field: keyof ScanDraft, value: string | number | boolean) => {
@@ -218,7 +215,8 @@ export function AssistantPage({ data, onApplyAction, onSaveRecipe, onManualEntry
   };
 
   const saveGeneratedRecipe = async () => {
-    if (!recipe) return;
+    if (!recipe || recipeSaveBusy) return;
+    setRecipeSaveBusy(true);
     setRecipeSaveError('');
     try {
       await onSaveRecipe(recipe);
@@ -226,6 +224,8 @@ export function AssistantPage({ data, onApplyAction, onSaveRecipe, onManualEntry
     } catch (error) {
       setRecipeSaveError(getErrorMessage(error));
       setRecipeSaveState('error');
+    } finally {
+      setRecipeSaveBusy(false);
     }
   };
 
@@ -391,7 +391,7 @@ export function AssistantPage({ data, onApplyAction, onSaveRecipe, onManualEntry
               </div>
               <div className="pa-button-row"><button className="pa-button" type="submit" disabled={!consented || !recipePrompt.trim() || generateRecipe.isPending} data-testid="button-generate-assistant-recipe">{generateRecipe.isPending ? <LoaderCircle size={14} /> : <Sparkles size={14} />}{generateRecipe.isPending ? 'Putting it together…' : 'Create recipe'}</button><span className="pa-field-hint" style={{ alignSelf: 'center' }}>Uses your inventory and preferences</span></div>
               {generateRecipe.isError && <div className="pa-error" role="alert" data-testid="error-generate-recipe"><AlertCircle size={14} />{getErrorMessage(generateRecipe.error)}</div>}
-              {recipe && <RecipeResult recipe={recipe} saved={recipeSaveState === 'saved'} saving={false} onSave={() => void saveGeneratedRecipe()} />}
+              {recipe && <RecipeResult recipe={recipe} saved={recipeSaveState === 'saved'} saving={recipeSaveBusy} onSave={() => void saveGeneratedRecipe()} />}
               {recipeSaveError && <div className="pa-error" role="alert"><AlertCircle size={14} />{recipeSaveError}</div>}
             </form>
           </section>
@@ -410,8 +410,14 @@ export function AssistantPage({ data, onApplyAction, onSaveRecipe, onManualEntry
                  <input ref={fileInput} type="file" accept="image/*" onChange={onImageSelected} hidden data-testid="input-kitchen-image" />
                  <button type="button" className="pa-button secondary" onClick={() => fileInput.current?.click()} disabled={scanBusy || analyzeImage.isPending} data-testid="button-upload-kitchen-image">{scanBusy || analyzeImage.isPending ? <LoaderCircle size={14} /> : <ImagePlus size={14} />}{scanBusy || analyzeImage.isPending ? 'Reviewing image…' : 'Choose an image'}</button>
                 <button type="button" className="pa-button outline" style={{ marginLeft: 8 }} onClick={onManualEntry} data-testid="button-manual-inventory-entry"><Plus size={14} /> Enter manually</button>
-                 {!consented && <p className="pa-field-hint" style={{ margin: '10px 0 0' }}>You can choose a file now; it stays on this device until you accept the data-use notice and analyze it.</p>}
-                 {selectedFile && consented && !scanBusy && !scanDrafts.length && <button type="button" className="pa-button" style={{ marginTop: 10 }} onClick={() => void analyzeSelectedFile(selectedFile)} data-testid="button-analyze-selected-image"><Sparkles size={14} />{scanError ? 'Try analysis again' : 'Analyze selected image'}</button>}
+                {selectedFile && !scanDrafts.length && (
+                  <div className="pa-selected-image" style={{ marginTop: 12, padding: 12, borderRadius: 12, background: '#f7f7ef', border: '1px solid #e7e7dc' }}>
+                    <strong style={{ display: 'block', fontSize: 12, marginBottom: 4 }}>{selectedFile.name}</strong>
+                    <span className="pa-field-hint">{consented ? `Ready to analyze for ${scanMode === 'receipt' ? 'the shopping list' : 'kitchen inventory'}.` : 'Consent is required before this image leaves this device.'}</span>
+                    <button type="button" className="pa-button" style={{ marginTop: 10 }} onClick={() => void analyzeSelectedFile(selectedFile)} disabled={scanBusy || analyzeImage.isPending || !consented} aria-describedby={!consented ? 'scan-analyze-disabled-reason' : undefined} data-testid="button-analyze-selected-image"><Sparkles size={14} />{scanBusy || analyzeImage.isPending ? 'Analyzing…' : scanError ? 'Try analysis again' : 'Analyze selected image'}</button>
+                    {!consented && <p id="scan-analyze-disabled-reason" className="pa-field-hint" style={{ margin: '8px 0 0' }}>Analyze is disabled: check the data-use consent above first.</p>}
+                  </div>
+                )}
               </div>
               {analyzeImage.isError && <div className="pa-error" role="alert" data-testid="error-analyze-image"><AlertCircle size={14} />{getErrorMessage(analyzeImage.error)}</div>}
               {scanError && <div className="pa-error" role="alert" data-testid="error-scan-review"><AlertCircle size={14} />{scanError}</div>}
@@ -453,7 +459,7 @@ export function AssistantPage({ data, onApplyAction, onSaveRecipe, onManualEntry
   );
 }
 
-function RecipeResult({ recipe, saved, onSave }: { recipe: GeneratedRecipe; saved: boolean; saving: boolean; onSave: () => void }) {
+function RecipeResult({ recipe, saved, saving, onSave }: { recipe: GeneratedRecipe; saved: boolean; saving: boolean; onSave: () => void }) {
   return <article className="pa-recipe-result" data-testid="card-generated-recipe">
     <h3>{recipe.title}</h3>
     <div className="pa-recipe-meta"><span><Clock3 size={12} /> {recipe.minutes} min</span><span>{recipe.servings} servings</span>{recipe.caloriesPerServing != null && <span>{recipe.caloriesPerServing} cal / serving</span>}{recipe.dietaryTags.map((tag) => <span key={tag}>{tag}</span>)}</div>
@@ -461,7 +467,7 @@ function RecipeResult({ recipe, saved, onSave }: { recipe: GeneratedRecipe; save
       <section><h4>Ingredients</h4>{recipe.ingredients.map((ingredient, index) => <div className="pa-ingredient" key={`${ingredient.name}-${index}`} data-testid={`ingredient-generated-${index}`}><span>{ingredient.name}</span><span>{ingredient.quantity} {ingredient.unit}</span></div>)}</section>
       <section><h4>Method</h4><ol className="pa-instructions">{recipe.instructions.map((instruction, index) => <li key={`${index}-${instruction.slice(0, 20)}`}>{instruction}</li>)}</ol></section>
     </div>
-    <div className="pa-button-row"><button type="button" className={`pa-button ${saved ? 'secondary' : ''}`} onClick={onSave} disabled={saved} data-testid="button-save-generated-recipe">{saved ? <><Check size={14} /> Saved to recipes</> : <><Plus size={14} /> Save this recipe</>}</button></div>
+    <div className="pa-button-row"><button type="button" className={`pa-button ${saved ? 'secondary' : ''}`} onClick={onSave} disabled={saved || saving} data-testid="button-save-generated-recipe">{saved ? <><Check size={14} /> Saved to recipes</> : saving ? <><LoaderCircle size={14} /> Saving…</> : <><Plus size={14} /> Save this recipe</>}</button></div>
     {saved && <div className="pa-status" role="status" data-testid="status-recipe-saved">Recipe saved to your collection.</div>}
   </article>;
 }

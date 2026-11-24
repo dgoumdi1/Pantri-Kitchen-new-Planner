@@ -33,9 +33,14 @@ export type ShoppingItem = {
 
 export type Preferences = {
   dietaryFilters: string[];
+  allergyFilters: string[];
+  cuisinePreferences: ('Worldwide' | 'Moroccan' | 'Italian' | 'Mexican' | 'Indian' | 'Chinese' | 'Japanese' | 'Mediterranean' | 'American' | 'Other')[];
   householdSize: number;
   units: 'Metric' | 'Imperial';
   expirationReminders: boolean;
+  budgetAmount: number | null;
+  budgetCurrency: 'USD' | 'EUR' | 'GBP' | 'MAD' | 'CAD';
+  budgetPeriod: 'Weekly' | 'Monthly';
 };
 
 export type AppData = {

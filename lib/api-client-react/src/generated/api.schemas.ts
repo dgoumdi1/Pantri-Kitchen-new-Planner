@@ -61,6 +61,22 @@ export interface ShoppingItem {
   sourceRecipe?: string | null;
 }
 
+export type PreferencesCuisinePreferencesItem = typeof PreferencesCuisinePreferencesItem[keyof typeof PreferencesCuisinePreferencesItem];
+
+
+export const PreferencesCuisinePreferencesItem = {
+  Worldwide: 'Worldwide',
+  Moroccan: 'Moroccan',
+  Italian: 'Italian',
+  Mexican: 'Mexican',
+  Indian: 'Indian',
+  Chinese: 'Chinese',
+  Japanese: 'Japanese',
+  Mediterranean: 'Mediterranean',
+  American: 'American',
+  Other: 'Other',
+} as const;
+
 export type PreferencesUnits = typeof PreferencesUnits[keyof typeof PreferencesUnits];
 
 
@@ -69,9 +85,31 @@ export const PreferencesUnits = {
   Imperial: 'Imperial',
 } as const;
 
+export type PreferencesBudgetCurrency = typeof PreferencesBudgetCurrency[keyof typeof PreferencesBudgetCurrency];
+
+
+export const PreferencesBudgetCurrency = {
+  USD: 'USD',
+  EUR: 'EUR',
+  GBP: 'GBP',
+  MAD: 'MAD',
+  CAD: 'CAD',
+} as const;
+
+export type PreferencesBudgetPeriod = typeof PreferencesBudgetPeriod[keyof typeof PreferencesBudgetPeriod];
+
+
+export const PreferencesBudgetPeriod = {
+  Weekly: 'Weekly',
+  Monthly: 'Monthly',
+} as const;
+
 export interface Preferences {
   /** @items.maxLength 40 */
   dietaryFilters: string[];
+  /** @items.maxLength 40 */
+  allergyFilters?: string[];
+  cuisinePreferences?: PreferencesCuisinePreferencesItem[];
   /**
      * @minimum 1
      * @maximum 20
@@ -79,6 +117,13 @@ export interface Preferences {
   householdSize: number;
   units: PreferencesUnits;
   expirationReminders: boolean;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  budgetAmount?: number | null;
+  budgetCurrency?: PreferencesBudgetCurrency;
+  budgetPeriod?: PreferencesBudgetPeriod;
 }
 
 export interface RecipeIngredient {
@@ -161,6 +206,12 @@ export interface MealPlanItem {
   title: string;
   /** @nullable */
   recipeId?: string | null;
+  /**
+     * @minimum 1
+     * @maximum 30
+     * @nullable
+     */
+  servings?: number | null;
 }
 
 export interface AccountData {

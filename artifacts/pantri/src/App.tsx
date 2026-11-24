@@ -19,9 +19,12 @@ import {
   type AccountData,
   type AssistantAction,
   type GeneratedRecipe,
+  type MealPlanItem,
 } from '@workspace/api-client-react';
 
 const dietaryChoices = ['Halal', 'Vegan', 'Vegetarian', 'Lactose-Free'];
+const cuisineChoices: Preferences['cuisinePreferences'] = ['Worldwide', 'Moroccan', 'Italian', 'Mexican', 'Indian', 'Chinese', 'Japanese', 'Mediterranean', 'American', 'Other'];
+const allergyChoices = ['Peanuts', 'Tree nuts', 'Milk', 'Egg', 'Fish', 'Shellfish', 'Soy', 'Wheat', 'Sesame'];
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const formatDate = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -35,7 +38,7 @@ const queryClient = new QueryClient({
 const emptyData = (): AppData => ({
   inventory: [],
   shopping: [],
-  preferences: { dietaryFilters: [], householdSize: 2, units: 'Metric', expirationReminders: true },
+  preferences: { dietaryFilters: [], allergyFilters: [], cuisinePreferences: ['Worldwide'], householdSize: 2, units: 'Metric', expirationReminders: true, budgetAmount: null, budgetCurrency: 'USD', budgetPeriod: 'Weekly' },
   savedRecipes: [],
   mealPlan: [],
 });
@@ -48,8 +51,19 @@ function toApiData(data: AppData): AccountData {
 }
 
 function fromApiData(data: AccountData): AppData {
+  const cuisinePreferences: Preferences['cuisinePreferences'] = data.preferences.cuisinePreferences?.includes('Worldwide') || !data.preferences.cuisinePreferences?.length
+    ? ['Worldwide']
+    : data.preferences.cuisinePreferences;
   return {
     ...data,
+    preferences: {
+      ...data.preferences,
+      allergyFilters: data.preferences.allergyFilters ?? [],
+      cuisinePreferences,
+      budgetAmount: data.preferences.budgetAmount ?? null,
+      budgetCurrency: data.preferences.budgetCurrency ?? 'USD',
+      budgetPeriod: data.preferences.budgetPeriod ?? 'Weekly',
+    },
     inventory: data.inventory.map((item) => ({ ...item, expirationDate: item.expirationDate ?? '' })),
   };
 }
@@ -295,6 +309,9 @@ function PantriApp() {
             <Route path="/recipes">
               <RecipesPage data={data} onPreferences={changePreferences} onAddShopping={addShopping} notify={notify} />
             </Route>
+            <Route path="/planner">
+              <MealPlannerPage data={data} onChange={(mealPlan) => updateData({ ...data, mealPlan })} notify={notify} />
+            </Route>
             <Route path="/shopping">
               <ShoppingPage data={data} onAdd={addShopping} onToggle={toggleShopping} onDelete={deleteShopping} />
             </Route>
@@ -360,7 +377,7 @@ function Dashboard({ data, greeting, onAdd, onEdit, onDelete }: { data: AppData;
           </div>
           <div className="panel inventory-list" data-testid="list-inventory">
             {inventory.length ? inventory.map((item) => <InventoryRow key={item.id} item={item} onEdit={onEdit} onDelete={onDelete} />) : (
-              <div className="empty-state"><strong>Your {location.toLowerCase()} is ready for something good.</strong>Add a food item to keep track of it here.</div>
+              <div className="empty-state"><strong>{location === 'All' ? 'Your kitchen' : `Your ${location.toLowerCase()}`} is ready for something good.</strong>Add a food item to keep track of it here.</div>
             )}
           </div>
         </section>
@@ -522,6 +539,91 @@ function RecipeModal({ recipe, inventory, onClose, onAdd }: { recipe: Recipe; in
   );
 }
 
+function localIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function MealPlannerPage({ data, onChange, notify }: { data: AppData; onChange: (mealPlan: MealPlanItem[]) => void; notify: (message: string) => void }) {
+  const [month, setMonth] = useState(() => new Date());
+  const [selectedDate, setSelectedDate] = useState(() => localIsoDate(new Date()));
+  const [manualTitle, setManualTitle] = useState('');
+  const [manualRecipeId, setManualRecipeId] = useState('');
+  const [manualSlot, setManualSlot] = useState<'Breakfast' | 'Lunch' | 'Dinner'>('Dinner');
+  const [manualServings, setManualServings] = useState(String(data.preferences.householdSize));
+  const first = new Date(month.getFullYear(), month.getMonth(), 1);
+  const gridStart = new Date(first);
+  gridStart.setDate(first.getDate() - first.getDay());
+  const days = Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + index);
+    return date;
+  });
+  const selectedMeals = data.mealPlan.filter((meal) => meal.date === selectedDate).sort((a, b) => ['Breakfast', 'Lunch', 'Dinner', 'Snack'].indexOf(a.meal) - ['Breakfast', 'Lunch', 'Dinner', 'Snack'].indexOf(b.meal));
+  const schedule = () => {
+    const title = manualRecipeId ? data.savedRecipes.find((recipe) => recipe.id === manualRecipeId)?.title : manualTitle.trim();
+    if (!title) return;
+    const conflict = data.mealPlan.find((meal) => meal.date === selectedDate && meal.meal === manualSlot);
+    if (conflict && !window.confirm(`${manualSlot} already has ${conflict.title}. Replace it?`)) return;
+    const next = [
+      ...data.mealPlan.filter((meal) => !(meal.date === selectedDate && meal.meal === manualSlot)),
+      { id: createId(), date: selectedDate, meal: manualSlot, title, recipeId: manualRecipeId || null, servings: Number(manualServings) || data.preferences.householdSize },
+    ] as MealPlanItem[];
+    onChange(next);
+    setManualTitle('');
+    notify(`${title} scheduled for ${selectedDate}.`);
+  };
+  const shiftMonth = (offset: number) => setMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
+  const monthLabel = month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  return (
+    <>
+      <div className="page-head"><div><div className="eyebrow">Meal Prep / Planner</div><h1 className="page-title">Your meal calendar</h1><p className="page-subtitle">Schedule saved recipes or add a manual meal.</p></div></div>
+      <div className="panel" style={{ padding: 16, marginBottom: 18 }}>
+        <div className="section-heading" style={{ margin: '0 0 12px' }}>
+          <h2>{monthLabel}</h2>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="button button-outline button-small" onClick={() => shiftMonth(-1)}>Previous</button>
+            <button className="button button-outline button-small" onClick={() => { const now = new Date(); setMonth(now); setSelectedDate(localIsoDate(now)); }}>Today</button>
+            <button className="button button-outline button-small" onClick={() => shiftMonth(1)}>Next</button>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
+          {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((label) => <div key={label} style={{ textAlign: 'center', fontSize: 11, color: '#87948a', fontWeight: 700 }}>{label}</div>)}
+          {days.map((date) => {
+            const iso = localIsoDate(date);
+            const count = data.mealPlan.filter((meal) => meal.date === iso).length;
+            return <button key={iso} onClick={() => setSelectedDate(iso)} aria-label={date.toLocaleDateString()} aria-pressed={selectedDate === iso} style={{ minHeight: 68, border: selectedDate === iso ? '2px solid #397456' : '1px solid #e8e5dc', borderRadius: 12, background: date.getMonth() === month.getMonth() ? '#fffdf8' : '#f5f3ec', color: '#40564a', textAlign: 'left', padding: 8 }}>
+              <strong style={{ display: 'block' }}>{date.getDate()}</strong>{count > 0 && <span style={{ color: '#397456', fontSize: 11 }}>{count} meal{count === 1 ? '' : 's'}</span>}
+            </button>;
+          })}
+        </div>
+      </div>
+      <div className="inventory-layout">
+        <section className="panel" style={{ padding: 16 }}>
+          <h2 className="settings-title">Agenda · {selectedDate}</h2>
+          {selectedMeals.length ? selectedMeals.map((meal) => (
+            <div key={meal.id} className="inventory-row" style={{ padding: '12px 0' }}>
+              <div className="item-info"><strong>{meal.meal}</strong><div className="item-name">{meal.title}</div>{meal.recipeId && <div className="item-meta">Saved recipe</div>}</div>
+              <button className="icon-button" aria-label={`Delete ${meal.title}`} onClick={() => { if (window.confirm(`Remove ${meal.title} from ${selectedDate}?`)) onChange(data.mealPlan.filter((item) => item.id !== meal.id)); }}><Trash2 size={15} /></button>
+            </div>
+          )) : <div className="empty-state">No meals scheduled for this day.</div>}
+        </section>
+        <aside className="panel" style={{ padding: 16 }}>
+          <h2 className="settings-title">Add a meal</h2>
+          <div className="field"><label htmlFor="manual-meal-date">Date</label><input id="manual-meal-date" type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} data-testid="input-meal-date" /></div>
+          <div className="field"><label htmlFor="manual-meal-slot">Meal</label><select id="manual-meal-slot" value={manualSlot} onChange={(event) => setManualSlot(event.target.value as 'Breakfast' | 'Lunch' | 'Dinner')}><option>Breakfast</option><option>Lunch</option><option>Dinner</option></select></div>
+          <div className="field"><label htmlFor="manual-meal-recipe">Saved recipe</label><select id="manual-meal-recipe" value={manualRecipeId} onChange={(event) => { setManualRecipeId(event.target.value); if (event.target.value) setManualTitle(''); }}><option value="">Enter a title manually</option>{data.savedRecipes.map((recipe) => <option key={recipe.id} value={recipe.id}>{recipe.title}</option>)}</select></div>
+          {!manualRecipeId && <div className="field"><label htmlFor="manual-meal-title">Meal title</label><input id="manual-meal-title" value={manualTitle} onChange={(event) => setManualTitle(event.target.value)} placeholder="Moroccan lentil soup" /></div>}
+          <div className="field"><label htmlFor="manual-meal-servings">Servings</label><input id="manual-meal-servings" type="number" min="1" max="30" value={manualServings} onChange={(event) => setManualServings(event.target.value)} /></div>
+          <button className="button button-primary" style={{ width: '100%', marginTop: 10 }} onClick={schedule} disabled={!manualRecipeId && !manualTitle.trim()} data-testid="button-schedule-meal">Schedule meal</button>
+        </aside>
+      </div>
+    </>
+  );
+}
+
 function ShoppingPage({ data, onAdd, onToggle, onDelete }: { data: AppData; onAdd: (item: Omit<ShoppingItem, 'id'>) => void; onToggle: (id: string) => void; onDelete: (id: string) => void }) {
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -617,10 +719,35 @@ function SettingsPage({ preferences, onChange, displayName, onSaveName, onDelete
           {preferences.dietaryFilters.length > 0 && <button className="button button-outline button-small" style={{ marginTop: 13 }} onClick={() => update('dietaryFilters', [])} data-testid="button-settings-clear-diet">Clear preferences</button>}
         </section>
         <section className="panel settings-card">
+          <h2 className="settings-title">Cuisine preferences</h2>
+          <p className="settings-description">Worldwide means no cuisine restriction. Dietary and allergy restrictions always remain in effect.</p>
+          <div className="choice-grid" role="group" aria-label="Cuisine preferences">
+            {cuisineChoices.map((choice) => {
+              const selected = preferences.cuisinePreferences.includes(choice);
+              return <button key={choice} className={`choice-chip ${selected ? 'selected' : ''}`} aria-pressed={selected} onClick={() => {
+                if (choice === 'Worldwide') update('cuisinePreferences', ['Worldwide']);
+                else update('cuisinePreferences', preferences.cuisinePreferences.filter((item) => item !== 'Worldwide').includes(choice)
+                  ? preferences.cuisinePreferences.filter((item) => item !== choice)
+                  : [...preferences.cuisinePreferences.filter((item) => item !== 'Worldwide'), choice]);
+              }} data-testid={`setting-cuisine-${choice.toLowerCase().replaceAll(' ', '-')}`}>{selected ? <Check size={13} style={{ display: 'inline', marginRight: 4 }} /> : null}{choice}</button>;
+            })}
+          </div>
+        </section>
+        <section className="panel settings-card">
+          <h2 className="settings-title">Allergies</h2>
+          <p className="settings-description">Pantri will keep these ingredients out of recipe suggestions.</p>
+          <div className="choice-grid" role="group" aria-label="Allergy preferences">
+            {allergyChoices.map((choice) => <button key={choice} className={`choice-chip ${preferences.allergyFilters.includes(choice) ? 'selected' : ''}`} aria-pressed={preferences.allergyFilters.includes(choice)} onClick={() => update('allergyFilters', preferences.allergyFilters.includes(choice) ? preferences.allergyFilters.filter((item) => item !== choice) : [...preferences.allergyFilters, choice])} data-testid={`setting-allergy-${choice.toLowerCase().replaceAll(' ', '-')}`}>{preferences.allergyFilters.includes(choice) ? <Check size={13} style={{ display: 'inline', marginRight: 4 }} /> : null}{choice}</button>)}
+          </div>
+        </section>
+        <section className="panel settings-card">
           <h2 className="settings-title">Your household</h2>
           <p className="settings-description">Helpful defaults for quantities and your weekly shop.</p>
           <div className="setting-row"><label htmlFor="household-size">People at your table</label><select id="household-size" value={preferences.householdSize} onChange={(event) => update('householdSize', Number(event.target.value))} data-testid="select-household-size">{[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n} {n === 1 ? 'person' : 'people'}</option>)}</select></div>
           <div className="setting-row"><label htmlFor="units-setting">Measurement style</label><select id="units-setting" value={preferences.units} onChange={(event) => update('units', event.target.value as Preferences['units'])} data-testid="select-units">{['Metric', 'Imperial'].map((unit) => <option key={unit}>{unit}</option>)}</select></div>
+          <div className="setting-row"><label htmlFor="budget-amount">Budget amount</label><input id="budget-amount" type="number" min="0" step="0.01" value={preferences.budgetAmount ?? ''} onChange={(event) => update('budgetAmount', event.target.value === '' ? null : Number(event.target.value))} data-testid="input-budget-amount" /></div>
+          <div className="setting-row"><label htmlFor="budget-currency">Budget currency</label><select id="budget-currency" value={preferences.budgetCurrency} onChange={(event) => update('budgetCurrency', event.target.value as Preferences['budgetCurrency'])} data-testid="select-budget-currency">{['USD', 'EUR', 'GBP', 'MAD', 'CAD'].map((currency) => <option key={currency}>{currency}</option>)}</select></div>
+          <div className="setting-row"><label htmlFor="budget-period">Budget period</label><select id="budget-period" value={preferences.budgetPeriod} onChange={(event) => update('budgetPeriod', event.target.value as Preferences['budgetPeriod'])} data-testid="select-budget-period">{['Weekly', 'Monthly'].map((period) => <option key={period}>{period}</option>)}</select></div>
           <div className="setting-row"><div><label htmlFor="expiration-reminders">Use-soon reminders</label><div style={{ color: '#87948a', fontSize: 12, marginTop: 3 }}>Show food close to its expiration date.</div></div><input id="expiration-reminders" className="check-input" type="checkbox" checked={preferences.expirationReminders} onChange={(event) => update('expirationReminders', event.target.checked)} data-testid="toggle-expiration-reminders" /></div>
         </section>
         <section className="panel settings-card">

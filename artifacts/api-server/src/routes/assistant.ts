@@ -24,6 +24,7 @@ import {
   getGeminiFailure,
   getJsonText,
   GEMINI_MODEL,
+  generateWithTransientRetry,
 } from "../lib/gemini";
 
 const router: IRouter = Router();
@@ -86,17 +87,38 @@ async function loadAccountData(userId: string): Promise<AccountData> {
     .from(pantriAccountDataTable)
     .where(eq(pantriAccountDataTable.userId, userId))
     .limit(1);
-  return (row?.data as AccountData | undefined) ?? {
+  const stored = row?.data as AccountData | undefined;
+  if (!stored) return {
     inventory: [],
     shopping: [],
     preferences: {
       dietaryFilters: [],
+      allergyFilters: [],
+      cuisinePreferences: ["Worldwide"],
       householdSize: 2,
       units: "Metric",
       expirationReminders: true,
+      budgetAmount: null,
+      budgetCurrency: "USD",
+      budgetPeriod: "Weekly",
     },
     savedRecipes: [],
     mealPlan: [],
+  };
+  const preferences = stored.preferences;
+  const cuisinePreferences = preferences.cuisinePreferences?.includes("Worldwide") || !preferences.cuisinePreferences?.length
+    ? (["Worldwide"] as NonNullable<AccountData["preferences"]["cuisinePreferences"]>)
+    : preferences.cuisinePreferences;
+  return {
+    ...stored,
+    preferences: {
+      ...preferences,
+      allergyFilters: preferences.allergyFilters ?? [],
+      cuisinePreferences,
+      budgetAmount: preferences.budgetAmount ?? null,
+      budgetCurrency: preferences.budgetCurrency ?? "USD",
+      budgetPeriod: preferences.budgetPeriod ?? "Weekly",
+    },
   };
 }
 
@@ -105,6 +127,17 @@ function sendGeminiError(req: Parameters<typeof getAuth>[0], res: import("expres
     res.status(503).json({
       errorCode: "gemini_key_missing",
       error: "Gemini is not configured yet. Add GEMINI_API_KEY in Replit Secrets; manual entry remains available.",
+    });
+    return;
+  }
+  const constructorName =
+    typeof error === "object" && error !== null
+      ? String((error as { constructor?: { name?: unknown } }).constructor?.name ?? "")
+      : "";
+  if (error instanceof SyntaxError || constructorName === "ZodError") {
+    res.status(502).json({
+      errorCode: "model_response_schema",
+      error: "The provider returned a response Pantri could not validate. No data was changed. Please retry; manual entry remains available.",
     });
     return;
   }
@@ -231,7 +264,7 @@ router.post("/assistant/chat", sharedFreeTierLimit, chatLimit, async (req, res):
   };
 
   try {
-    const result = await getGeminiClient().models.generateContent({
+    const result = await generateWithTransientRetry(() => getGeminiClient().models.generateContent({
       model: GEMINI_MODEL,
       contents,
       config: {
@@ -239,7 +272,7 @@ router.post("/assistant/chat", sharedFreeTierLimit, chatLimit, async (req, res):
         responseJsonSchema: responseSchema,
         maxOutputTokens: 2048,
       },
-    });
+    }));
     const raw = JSON.parse(getJsonText(result)) as unknown;
     const reply = SendAssistantMessageResponse.parse(raw);
 
@@ -291,7 +324,7 @@ router.post("/assistant/recipes", sharedFreeTierLimit, recipeLimit, async (req, 
   };
 
   try {
-    const result = await getGeminiClient().models.generateContent({
+    const result = await generateWithTransientRetry(() => getGeminiClient().models.generateContent({
       model: GEMINI_MODEL,
       contents: [
         "Create one practical recipe. Ingredient amounts must be explicit numeric quantities with units. Do not invent nutrition facts. Return JSON only.",
@@ -304,7 +337,7 @@ router.post("/assistant/recipes", sharedFreeTierLimit, recipeLimit, async (req, 
         responseJsonSchema: recipeSchema,
         maxOutputTokens: 2500,
       },
-    });
+    }));
     const generated = JSON.parse(getJsonText(result)) as Record<string, unknown>;
     const recipe = GenerateAssistantRecipeResponse.parse({
       ...generated,
@@ -388,7 +421,7 @@ router.post("/assistant/scan", sharedFreeTierLimit, scanLimit, async (req, res):
       : "Identify visible foods in this kitchen photo that could be added to a home inventory. Do not guess hidden items, quantities, or expiration dates. Use conservative quantities, storage locations, confidence from 0 to 1, and explain uncertainty in notes.";
 
   try {
-    const result = await getGeminiClient().models.generateContent({
+    const result = await generateWithTransientRetry(() => getGeminiClient().models.generateContent({
       model: GEMINI_MODEL,
       contents: [
         {
@@ -404,7 +437,7 @@ router.post("/assistant/scan", sharedFreeTierLimit, scanLimit, async (req, res):
         responseJsonSchema: scanSchema,
         maxOutputTokens: 2500,
       },
-    });
+    }));
     const analysis = AnalyzeKitchenImageResponse.parse(
       JSON.parse(getJsonText(result)),
     );

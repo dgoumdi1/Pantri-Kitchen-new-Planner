@@ -235,7 +235,7 @@ router.post("/assistant/chat", sharedFreeTierLimit, chatLimit, async (req, res):
   }
 });
 
-router.post("/assistant/recipes", recipeLimit, async (req, res): Promise<void> => {
+router.post("/assistant/recipes", sharedFreeTierLimit, recipeLimit, async (req, res): Promise<void> => {
   const userId = getUserId(req);
   if (!userId) {
     res.status(401).json({ error: "Sign in to generate recipes." });
@@ -301,7 +301,7 @@ router.post("/assistant/recipes", recipeLimit, async (req, res): Promise<void> =
   }
 });
 
-router.post("/assistant/scan", scanLimit, async (req, res): Promise<void> => {
+router.post("/assistant/scan", sharedFreeTierLimit, scanLimit, async (req, res): Promise<void> => {
   const userId = getUserId(req);
   if (!userId) {
     res.status(401).json({ error: "Sign in to scan a kitchen image." });
